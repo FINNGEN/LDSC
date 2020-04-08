@@ -1,0 +1,7 @@
+{
+    "ldsc_rg.docker": "gcr.io/finngen-refinery-dev/ldsc:1",
+    "ldsc_rg.meta_fg": "gs://r5_data/ldsc/meta_fg_drugs.txt",
+    "ldsc_rg.meta_ukbb": "gs://r5_data/ldsc/meta_ukbb_z4.txt",
+    "ldsc_rg.munge_ukbb_neale.variants": "gs://r5_data/ldsc/variants.tsv.bgz",
+    "ldsc_rg.gather.outfile": "ldsc_drugs_ukb.txt"
+}
