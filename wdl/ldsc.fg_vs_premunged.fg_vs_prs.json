@@ -1,0 +1,6 @@
+{
+    "ldsc_rg.docker": "gcr.io/finngen-refinery-dev/ldsc:1",
+    "ldsc_rg.meta_fg": "gs://r5_data/ldsc/R5_1000_cases.txt",
+    "ldsc_rg.meta_premunged": "gs://r5_data/ldsc/meta_premunged.txt",
+    "ldsc_rg.gather.outfile": "ldsc_r5_1000_cases_prs_traits.txt"
+}
