@@ -1,0 +1,7 @@
+{
+  "ldsc_rg.docker": "gcr.io/finngen-refinery-dev/ldsc:1",
+  "ldsc_rg.meta_fg": "gs://r7_data/ldsc/sumstats_data.txt",
+  "ldsc_rg.test": True,
+  "ldsc_rg.snplist": "gs://r7_data/snplist/w_hm3.snplist",
+  "ldsc_rg.meta_prs": "gs://r7_data/ldsc/prs_data.txt"
+}

@@ -1,0 +1,6 @@
+{
+    "ldsc_rg.docker": "gcr.io/finngen-refinery-dev/ldsc:1",
+    "ldsc_rg.meta_fg": "gs://r5_data/ldsc/meta_fg_drugs.txt",
+    "ldsc_rg.file1": "gs://r5_data/ldsc/sumstats/daner_PGC_SCZ52_0513a.resultfiles_PGC_SCZ52_0513.sh2_nofin.premunge.gz",
+    "ldsc_rg.gather.outfile": "ldsc_drugs_ukb.txt"
+}
