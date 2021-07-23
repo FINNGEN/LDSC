@@ -31,8 +31,6 @@ workflow ldsc_rg {
 
 
 
-
-
 task rg {
 
     File file1
