@@ -1,7 +1,15 @@
 {
+  "ldsc_rg.test": False,
+  "ldsc_rg.meta_fg": "gs://r7_data/ldsc/sumstats_munged.txt",
+  "ldsc_rg.meta_comparison": "gs://r7_data/ldsc/prs_data.txt",
+
   "ldsc_rg.docker": "gcr.io/finngen-refinery-dev/ldsc:1",
-  "ldsc_rg.meta_fg": "gs://r7_data/ldsc/sumstats_data.txt",
-  "ldsc_rg.test": True,
   "ldsc_rg.snplist": "gs://r7_data/snplist/w_hm3.snplist",
-  "ldsc_rg.meta_prs": "gs://r7_data/ldsc/prs_data.txt"
+
+  # multi inputs:
+  "ldsc_rg.multi_rg.cpus": 95,
+  "ldsc_rg.multi_rg.multi_docker": "eu.gcr.io/finngen-refinery-dev/ldsc:2",
+  "ldsc_rg.multi_rg.args": " '--ref-ld-chr /eur_w_ld_chr/ --w-ld-chr /eur_w_ld_chr/' ",
+
+
 }

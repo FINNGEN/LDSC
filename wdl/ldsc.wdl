@@ -1,7 +1,7 @@
 workflow ldsc_rg {
 
     File meta_fg
-    File meta_prs
+    File meta_comparison
     File snplist
 
     String docker
@@ -9,26 +9,110 @@ workflow ldsc_rg {
 
 
     Array[Array[String]] sumstats_fg = read_tsv(meta_fg)
-    Array[Array[String]] sumstats_prs = read_tsv(meta_prs)
+    Array[Array[String]] sumstats_comparison = read_tsv(meta_comparison)
 
     Array[Array[String]] fg_meta  = if test then [sumstats_fg[0],sumstats_fg[1]]   else sumstats_fg
-    Array[Array[String]] prs_meta = if test then [sumstats_prs[0],sumstats_prs[1]] else sumstats_prs
+    Array[Array[String]] comparison_meta = if test then [sumstats_comparison[0],sumstats_comparison[1]] else sumstats_comparison
 
-    scatter (a in prs_meta) {
-        call munge_prs {
-            input: docker=docker, study=a[0], sumstats=a[1], n=a[2],snplist = snplist
+    scatter (a in comparison_meta) {
+        call munge_ldsc as munge_comparison {
+            input: docker=docker, pheno=a[0], sumstats=a[1], n=a[2],snplist = snplist
         }
     }
-    scatter (a in fg_meta) {
-        call munge_fg {
-            input: docker=docker, pheno=a[0], sumstats=a[1], n=a[2],snplist = snplist
-            }
-        call rg {
-            input: docker=docker, file1=munge_fg.out, files2=munge_prs.out
+    scatter (fg in fg_meta) {
+        call munge_ldsc {
+            input: docker=docker, pheno=fg[0], sumstats=fg[1], n=fg[2],snplist = snplist
             }
       }
+
+    call multi_rg {
+      input: fg_files = munge_ldsc.out,comparison_files=munge_comparison.out,docker = docker
+
+    }
 }
 
+
+task multi_rg {
+
+  Array[File] fg_files
+  Array[File] comparison_files
+
+  String args
+  Int cpus
+
+  Int disk_size = ceil(size(fg_files[0],"MB"))*length(fg_files) + ceil(size(comparison_files[0],'MB'))*length(comparison_files)
+  Int final_disk_size = ceil(disk_size/1000) + 20
+
+  String docker
+  String? multi_docker
+  String? final_docker = if defined(multi_docker) then multi_docker else docker
+
+
+  command <<<
+  echo ${disk_size} ${final_disk_size}
+
+  python3 /scripts/ldsc_mult.py \
+  --ldsc-path "ldsc.py" \
+  --list-1  ${write_lines(fg_files)} \
+  --list-2  ${write_lines(comparison_files)} \
+  -o /cromwell_root/results/ \
+  --args ${args}
+
+  >>>
+
+  output {
+      Array[File] out = glob("/cromwell_root/results/*")
+  }
+
+  runtime {
+      docker: "${final_docker}"
+      cpu: "${cpus}"
+      memory: "${cpus} GB"
+      disks: "local-disk ${final_disk_size} HDD"
+      zones: "europe-west1-b"
+      preemptible: 2
+      noAddress: true
+  }
+
+
+}
+
+
+task munge_ldsc {
+
+    File sumstats
+    String pheno
+    String docker
+    Int n
+    File snplist
+
+    Int file_size = ceil(size(sumstats,"GB")) + 1
+
+    command <<<
+
+        munge_sumstats.py \
+        --sumstats ${sumstats} \
+        --N ${n} \
+        --out ${pheno}.ldsc \
+        --merge-alleles ${snplist}
+
+    >>>
+
+    output {
+        File out = pheno + ".ldsc.sumstats.gz"
+        File log = pheno + ".ldsc.log"
+    }
+
+    runtime {
+        docker: "${docker}"
+        cpu: 1
+        memory: "4 GB"
+        disks: "local-disk ${file_size} HDD"
+        zones: "europe-west1-b"
+        preemptible: 2
+        noAddress: true
+    }
+}
 
 
 task rg {
@@ -67,78 +151,4 @@ task rg {
         preemptible: 2
         noAddress: true
     }
-}
-
-task munge_prs {
-
-    File sumstats
-    String study
-    String docker
-    Int n
-    File snplist
-
-    command <<<
-
-        munge_sumstats.py \
-        --sumstats ${sumstats} \
-        --N ${n} \
-        --out ${study}.ldsc \
-        --merge-alleles ${snplist}
-
-    >>>
-
-    output {
-        File out = study + ".ldsc.sumstats.gz"
-        File log = study + ".ldsc.log"
-    }
-
-    runtime {
-        docker: "${docker}"
-        cpu: 1
-        memory: "4 GB"
-        disks: "local-disk 200 HDD"
-        zones: "europe-west1-b"
-        preemptible: 2
-        noAddress: true
-    }
-}
-task munge_fg {
-
-  String pheno
-  File sumstats
-  Int n
-  String docker
-  File snplist
-
-  command <<<
-
-    gunzip -c ${sumstats} | \
-    awk 'BEGIN{FS=OFS="\t"} \
-    NR==1{for(i=1;i<=NF;i++) a[$i]=i; print "SNP","A1","A2","BETA","P"} \
-    NR>1 {if($a["rsids"]!="") print $a["rsids"],$a["alt"],$a["ref"],$a["beta"],$a["pval"]}' | \
-    awk 'BEGIN{FS=OFS="\t"} {n=split($1,a,","); for(i=1;i<=n;i++) print a[i],$0}' | \
-    cut -f1,3- | gzip > ${pheno}.premunge.gz
-
-    munge_sumstats.py \
-    --sumstats ${pheno}.premunge.gz \
-    --N ${n} \
-    --out ${pheno}.ldsc \
-    --merge-alleles ${snplist}
-
-    >>>
-
-    output {
-      File out = pheno + ".ldsc.sumstats.gz"
-      File log = pheno + ".ldsc.log"
-    }
-
-    runtime {
-      docker: "${docker}"
-      cpu: 1
-      memory: "4 GB"
-      disks: "local-disk 200 HDD"
-      zones: "europe-west1-b"
-      preemptible: 2
-      noAddress: true
-      }
 }

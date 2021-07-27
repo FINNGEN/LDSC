@@ -1,0 +1,6 @@
+{
+  "munge_fg.test": False,
+  "munge_fg.docker": "gcr.io/finngen-refinery-dev/ldsc:1",
+  #"munge_fg.meta_fg": "gs://r7_data/ldsc/test_data.txt"
+  "munge_fg.meta_fg": "gs://r7_data/ldsc/sumstats_data.txt"
+}
