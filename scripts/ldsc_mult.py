@@ -17,6 +17,31 @@ def get_unique_pairs(list1,list2):
     return sorted_couples
 
 
+def return_file_couples(couples,list1,list2):
+
+    """
+    From the pheno couples, create file lists
+    """
+    with open(list1) as i: first_list = [elem.strip() for elem in i.readlines()]
+    with open(list2) as i: second_list = [elem.strip() for elem in i.readlines()]
+
+
+    # create mapping of basenames to sumstats
+    pheno_file_dict ={}
+    for f in first_list + second_list:
+        base = os.path.basename(f).split('.ldsc.sumstats.gz')[0]
+        pheno_file_dict[base] = f
+
+    # recreate couples based on files
+    file_couples = []
+    with open(couples) as i:
+        for line in i:
+            pheno1,pheno2 = line.strip().split()
+            file_couples.append([pheno_file_dict[pheno1],pheno_file_dict[pheno2]])
+
+    return file_couples
+
+
 
 def multiproc(couples,args,cpus,out_path,ldsc_path):
 
@@ -50,7 +75,11 @@ def multi_func(file1,file2,cmd):
 
 def main(args):
 
-    couples = get_unique_pairs(args.list_1,args.list_2)
+    if not args.couples:
+        couples = get_unique_pairs(args.list_1,args.list_2)
+    else:
+        couples = return_file_couples(args.couples,args.list_1,args.list_2)
+
 
     multiproc(couples,args.args,args.cpus,args.o,args.ldsc_path)
 
@@ -60,6 +89,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description ="Parallelize ldsc generation.")
     parser.add_argument('--list-1',help ='Input files 1',required = True)
     parser.add_argument('--list-2',help ='Input files 2',required = True)
+    parser.add_argument('--couples',help ='List of couples to be analyzed using basenames of files')
+
     parser.add_argument('--ldsc-path',help ='Path to ldsc path', required = False, default = 'ldsc.py')
     parser.add_argument("-o",help ="Out path")
     parser.add_argument("--args",help = "ldsc args",required = True,type = str)
@@ -69,4 +100,4 @@ if __name__ == '__main__':
     print(args)
     make_sure_path_exists(args.o)
 
-main(args)
+    main(args)
