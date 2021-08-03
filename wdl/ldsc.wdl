@@ -41,10 +41,21 @@ workflow ldsc_rg {
         input :
         docker = docker, couples=couples,fg_files = munge_ldsc.out, comparison_files=munge_comparison.out,
       }
-      #call multi_rg { input:        couples=couples,        jobs=return_couples.jobs,        docker = docker,args=ldsc_args      }
+
+      call multi_rg { input:
+        couples   = filter_sumstats.couple_list ,
+        sumstats = filter_sumstats.file_list,
+        jobs=return_couples.jobs,
+        docker = docker,args=ldsc_args,
+      }
     }
 
-    #call gather{        input:        docker = docker,        glob_summaries = multi_rg.out,        comp_h2 = munge_comparison.het_json,        fg_h2 = munge_ldsc.het_json    }
+    call gather{
+           input:
+              docker = docker,
+              glob_summaries = multi_rg.out,
+              comp_h2 = munge_comparison.het_json,
+              fg_h2 = munge_ldsc.het_json    }
 
 }
 
@@ -72,7 +83,7 @@ task gather {
   cat ${write_lines(fg_h2)} >> h2.txt
 
   cat h2.txt
-
+  cat ${write_lines(summaries)}
   python3 /scripts/extract_metadata.py \
   --summaries ${write_lines(summaries)} \
   --het h2.txt \
@@ -119,7 +130,7 @@ task filter_sumstats{
   >>>
 
   output {
-      File file_list = "final_list.txt"
+      Array[String] file_list = read_lines("final_list.txt")
       File couple_list = couples
   }
 
@@ -136,17 +147,15 @@ task filter_sumstats{
 
 task multi_rg {
 
-
-  Array[File] fg_files
-  Array[File] comparison_files
+  Array[File] sumstats
   File couples
   String args
 
   Int cpus
   Int jobs
   Int final_cpus = if jobs > cpus then cpus else jobs
-
-  Int disk_size = ceil(size(fg_files[0],"MB"))*length(fg_files) + ceil(size(comparison_files[0],'MB'))*length(comparison_files)
+  Int mem = 2*cpus
+  Int disk_size = ceil(size(sumstats[0],"MB"))*length(sumstats)
   Int final_disk_size = ceil(disk_size/1000) + 20
 
   String docker
@@ -156,11 +165,12 @@ task multi_rg {
 
   command <<<
   echo ${disk_size} ${final_disk_size} ${final_cpus}
+  cat ${write_lines(sumstats)} > sumstats.txt
+  wc -l sumstats.txt
 
   python3 /scripts/ldsc_mult.py \
    --ldsc-path "ldsc.py" \
-   --list-1  ${write_lines(fg_files)} \
-   --list-2  ${write_lines(comparison_files)} \
+   --list sumstats.txt   \
    --couples ${couples} \
    -o /cromwell_root/results/ \
    --args ${args}
@@ -174,7 +184,7 @@ task multi_rg {
   runtime {
       docker: "${final_docker}"
       cpu: "${final_cpus}"
-      memory: "${final_cpus} GB"
+      memory: "${mem} GB"
       disks: "local-disk ${final_disk_size} HDD"
       zones: "europe-west1-b"
       preemptible: 2

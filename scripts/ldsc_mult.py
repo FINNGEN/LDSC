@@ -2,37 +2,40 @@ import gzip,argparse,os,multiprocessing,itertools,time
 from utils import make_sure_path_exists,progressBar,tmp_bash
 
 
-def get_unique_pairs(list1,list2):
+def get_unique_pairs(file_list,out_path):
 
 
     # read lists and keep only one instance of each file
-    with open(list1) as i: first_list = [elem.strip() for elem in i.readlines()]
-    with open(list2) as i: second_list = [elem.strip() for elem in i.readlines()]
+    with open(file_list) as i: files = [elem.strip() for elem in i.readlines()]
+
 
     # get all couples possible as the product of both lists
-    couples = itertools.product(set(first_list),set(second_list))
+    couples = itertools.product(set(files),set(files))
     # sort all couples into tuples --> create set in order to remove duplicate entries
     sorted_couples = sorted(list(set([tuple(sorted(list(couple))) for couple in couples])))
 
+    with open(os.path.join(out_path,'couples.txt'),'wt') as o:
+        for couple in sorted_couples:
+            phenos = [os.path.basename(elem).split(".ldsc.sumstats")[0] for elem in  couple]
+            o.write('\t'.join(phenos) + '\n')
     return sorted_couples
 
 
-def return_file_couples(couples,list1,list2):
+def return_file_couples(couples,file_list):
 
     """
     From the pheno couples, create file lists
     """
-    with open(list1) as i: first_list = [elem.strip() for elem in i.readlines()]
-    with open(list2) as i: second_list = [elem.strip() for elem in i.readlines()]
+    with open(file_list) as i: files = [elem.strip() for elem in i.readlines()]
 
 
     # create mapping of basenames to sumstats
     pheno_file_dict ={}
-    for f in first_list + second_list:
+    for f in files:
         base = os.path.basename(f).split('.ldsc.sumstats.gz')[0]
         pheno_file_dict[base] = f
 
-    # recreate couples based on files
+    # recreate couples based on file names
     file_couples = []
     with open(couples) as i:
         for line in i:
@@ -76,19 +79,19 @@ def multi_func(file1,file2,cmd):
 def main(args):
 
     if not args.couples:
-        couples = get_unique_pairs(args.list_1,args.list_2)
+        couples = get_unique_pairs(args.list,args.o)
+
     else:
-        couples = return_file_couples(args.couples,args.list_1,args.list_2)
+        couples = return_file_couples(args.couples,args.list)
 
-
+    #for elem in couples:print('\t'.join([os.path.basename(f) for f in elem]))
     multiproc(couples,args.args,args.cpus,args.o,args.ldsc_path)
 
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description ="Parallelize ldsc generation.")
-    parser.add_argument('--list-1',help ='Input files 1',required = True)
-    parser.add_argument('--list-2',help ='Input files 2',required = True)
+    parser.add_argument('--list',help ='Input files 1',required = True)
     parser.add_argument('--couples',help ='List of couples to be analyzed using basenames of files')
 
     parser.add_argument('--ldsc-path',help ='Path to ldsc path', required = False, default = 'ldsc.py')
