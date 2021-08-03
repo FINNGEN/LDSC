@@ -3,6 +3,7 @@ workflow ldsc_rg {
     File meta_fg
     File meta_comparison
     File snplist
+    String ldsc_args
 
     String docker
     Boolean test
@@ -16,16 +17,15 @@ workflow ldsc_rg {
     Array[Array[String]] comparison_meta = if test then [sumstats_comparison[0],sumstats_comparison[1]] else sumstats_comparison
 
 
-
     scatter (a in comparison_meta) {
         call munge_ldsc as munge_comparison {
-            input: docker=docker, pheno=a[0], sumstats=a[1], n=a[2],snplist = snplist
+            input: docker=docker, pheno=a[0], sumstats=a[1], n=a[2],snplist = snplist,args=ldsc_args
         }
     }
 
     scatter (fg in fg_meta) {
         call munge_ldsc {
-            input: docker=docker, pheno=fg[0], sumstats=fg[1], n=fg[2],snplist = snplist
+            input: docker=docker, pheno=fg[0], sumstats=fg[1], n=fg[2],snplist = snplist,args=ldsc_args
             }
       }
 
@@ -35,16 +35,16 @@ workflow ldsc_rg {
       }
 
     # runs only selected jobs in each chunk (but localizes all files)
-    scatter (chunk in return_couples.chunk_lists){
+    scatter (couples in return_couples.chunk_lists) {
 
-      call multi_rg {
-        input: couples=chunk,fg_files = munge_ldsc.out,comparison_files=munge_comparison.out,docker = docker
+      call filter_sumstats {
+        input :
+        docker = docker, couples=couples,fg_files = munge_ldsc.out, comparison_files=munge_comparison.out,
       }
+      #call multi_rg { input:        couples=couples,        jobs=return_couples.jobs,        docker = docker,args=ldsc_args      }
     }
 
-    call gather{
-        input: docker = docker, glob_summaries = multi_rg.out
-    }
+    #call gather{        input:        docker = docker,        glob_summaries = multi_rg.out,        comp_h2 = munge_comparison.het_json,        fg_h2 = munge_ldsc.het_json    }
 
 }
 
@@ -53,6 +53,8 @@ task gather {
 
   Array[Array[File]]  glob_summaries
   Array[File] summaries = flatten(glob_summaries)
+  Array[File] comp_h2
+  Array[File] fg_h2
 
   String name
   Int disk_size = ceil(size(summaries[0],'MB'))*length(summaries)
@@ -66,8 +68,14 @@ task gather {
 
   command <<<
 
+  cat ${write_lines(comp_h2)} >> h2.txt
+  cat ${write_lines(fg_h2)} >> h2.txt
+
+  cat h2.txt
+
   python3 /scripts/extract_metadata.py \
   --summaries ${write_lines(summaries)} \
+  --het h2.txt \
   --name ${name}
 
   >>>
@@ -76,8 +84,6 @@ task gather {
     File summary = "${name}.ldsc.summary.log"
     File herit = "${name}.ldsc.heritability.json"
     File herit_tsv = "${name}.ldsc.heritability.tsv"
-
-
   }
 
   runtime {
@@ -93,16 +99,52 @@ task gather {
 }
 
 
+task filter_sumstats{
 
+  Array[String] fg_files
+  Array[String] comparison_files
+  File couples
+  Array[String] s_couples = flatten(read_tsv(couples))
+
+  String docker
+
+  command <<<
+
+  cat ${write_lines(fg_files)} >> file_list.txt
+  cat ${write_lines(comparison_files)} >> file_list.txt
+  cat ${write_lines(s_couples)} | sort | uniq | sed -e 's/$/.ldsc/' > phenos.txt
+
+  grep file_list.txt -wf phenos.txt > final_list.txt
+
+  >>>
+
+  output {
+      File file_list = "final_list.txt"
+      File couple_list = couples
+  }
+
+  runtime {
+      docker: "${docker}"
+      cpu: "1"
+      memory: "1 GB"
+      disks: "local-disk 1 HDD"
+      zones: "europe-west1-b"
+      preemptible: 2
+      noAddress: true
+  }
+}
 
 task multi_rg {
+
 
   Array[File] fg_files
   Array[File] comparison_files
   File couples
-
   String args
+
   Int cpus
+  Int jobs
+  Int final_cpus = if jobs > cpus then cpus else jobs
 
   Int disk_size = ceil(size(fg_files[0],"MB"))*length(fg_files) + ceil(size(comparison_files[0],'MB'))*length(comparison_files)
   Int final_disk_size = ceil(disk_size/1000) + 20
@@ -113,15 +155,15 @@ task multi_rg {
 
 
   command <<<
-  echo ${disk_size} ${final_disk_size}
+  echo ${disk_size} ${final_disk_size} ${final_cpus}
 
   python3 /scripts/ldsc_mult.py \
-  --ldsc-path "ldsc.py" \
-  --list-1  ${write_lines(fg_files)} \
-  --list-2  ${write_lines(comparison_files)} \
-  --couples ${couples} \
-  -o /cromwell_root/results/ \
-  --args ${args}
+   --ldsc-path "ldsc.py" \
+   --list-1  ${write_lines(fg_files)} \
+   --list-2  ${write_lines(comparison_files)} \
+   --couples ${couples} \
+   -o /cromwell_root/results/ \
+   --args ${args}
 
   >>>
 
@@ -131,8 +173,8 @@ task multi_rg {
 
   runtime {
       docker: "${final_docker}"
-      cpu: "${cpus}"
-      memory: "${cpus} GB"
+      cpu: "${final_cpus}"
+      memory: "${final_cpus} GB"
       disks: "local-disk ${final_disk_size} HDD"
       zones: "europe-west1-b"
       preemptible: 2
@@ -154,7 +196,7 @@ task return_couples {
 
   python3 <<CODE
 
-  import itertools
+  import itertools,os
 
   with open('${write_tsv(list1)}') as i: first_list = [elem.strip().split()[0] for elem in i.readlines()]
   with open('${write_tsv(list2)}') as i: second_list = [elem.strip().split()[0] for elem in i.readlines()]
@@ -167,17 +209,20 @@ task return_couples {
   n = 1 + len(sorted_couples)//${chunks}
   sublists = [sorted_couples[i:i + n] for i in range(0, len(sorted_couples), n)]
 
-  for i,l in enumerate(sublists):
+  for i,sub in enumerate(sublists):
       with open(f"./chunk_{i}",'wt') as o:
-          for c in l:
+          for c in sub:
             o.write('\t'.join(c) + '\n')
 
+  with open('jobs.txt','wt') as o:
+      o.write(str(n))
 
   CODE
   >>>
 
   output {
       Array[File] chunk_lists = glob("./chunk*")
+      Int jobs = read_int("jobs.txt")
   }
 
   runtime {
@@ -197,6 +242,8 @@ task munge_ldsc {
 
     File sumstats
     String pheno
+    String args
+
     String docker
     Int n
     File snplist
@@ -211,11 +258,19 @@ task munge_ldsc {
         --out ${pheno}.ldsc \
         --merge-alleles ${snplist}
 
+        python3 /scripts/het.py \
+        --ldsc-path "ldsc.py" \
+        --sumstats ${pheno}.ldsc.sumstats.gz \
+        -o . \
+        --args ${args}
+
     >>>
 
     output {
         File out = pheno + ".ldsc.sumstats.gz"
         File log = pheno + ".ldsc.log"
+        File het_log = pheno + ".ldsc.h2.log"
+        File het_json = pheno + ".ldsc.h2.json"
     }
 
     runtime {

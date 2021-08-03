@@ -34,3 +34,18 @@ def tmp_bash(cmd,check = False):
         subprocess.check_call(scriptFile.name)
     else:
         subprocess.call(scriptFile.name,stderr = subprocess.DEVNULL,stdout  = subprocess.DEVNULL)
+
+def isfloat(value):
+  try:
+    float(value)
+    return True
+  except ValueError:
+    return False
+
+
+from math import log10, floor
+def round_sig(x, sig=2):
+    if x == 0:
+        return str(int(0))
+    else:
+        return round(x, sig-int(floor(log10(abs(x))))-1)
