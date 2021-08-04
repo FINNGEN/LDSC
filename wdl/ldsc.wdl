@@ -4,7 +4,7 @@ workflow ldsc_rg {
     File meta_comparison
     File snplist
     String ldsc_args
-
+    String name
     String docker
     Boolean test
 
@@ -31,7 +31,7 @@ workflow ldsc_rg {
 
     # splits jobs into chunks (parameter)
     call return_couples {
-      input : list1 = fg_meta,list2 = comparison_meta,
+      input : list1 = fg_meta,list2 = comparison_meta,docker = docker,
       }
 
     # runs only selected jobs in each chunk (but localizes all files)
@@ -49,23 +49,28 @@ workflow ldsc_rg {
         docker = docker,args=ldsc_args,
       }
     }
+    call gather_h2 {
+      input:
+        name = name,
+        docker = docker,
+        comp_h2 = munge_comparison.het_json,
+        fg_h2 = munge_ldsc.het_json,
+    }
 
-    call gather{
+
+    call gather_summaries {
            input:
               docker = docker,
+              name = name,
               glob_summaries = multi_rg.out,
-              comp_h2 = munge_comparison.het_json,
-              fg_h2 = munge_ldsc.het_json    }
-
+    }
 }
 
 
-task gather {
+task gather_summaries {
 
   Array[Array[File]]  glob_summaries
   Array[File] summaries = flatten(glob_summaries)
-  Array[File] comp_h2
-  Array[File] fg_h2
 
   String name
   Int disk_size = ceil(size(summaries[0],'MB'))*length(summaries)
@@ -79,22 +84,16 @@ task gather {
 
   command <<<
 
-  cat ${write_lines(comp_h2)} >> h2.txt
-  cat ${write_lines(fg_h2)} >> h2.txt
-
   cat h2.txt
   cat ${write_lines(summaries)}
   python3 /scripts/extract_metadata.py \
   --summaries ${write_lines(summaries)} \
-  --het h2.txt \
   --name ${name}
 
   >>>
 
   output {
     File summary = "${name}.ldsc.summary.log"
-    File herit = "${name}.ldsc.heritability.json"
-    File herit_tsv = "${name}.ldsc.heritability.tsv"
   }
 
   runtime {
@@ -109,6 +108,50 @@ task gather {
 
 }
 
+task gather_h2 {
+
+  Array[File] comp_h2
+  Array[File] fg_h2
+  String name
+
+  String docker
+  String? gather_docker
+  String? final_docker = if defined(gather_docker) then gather_docker else docker
+
+
+  command <<<
+
+  cat ${write_lines(comp_h2)} >> h2.txt
+  cat ${write_lines(fg_h2)} >> h2.txt
+
+  python3 /scripts/extract_metadata.py \
+  --het h2.txt \
+  --name ${name}
+
+  python3 /scripts/plot_summary.py  --het ${name}.ldsc.heritability.tsv  --columns INT RATIO
+
+  >>>
+
+  output {
+    File herit = "${name}.ldsc.heritability.json"
+    File herit_tsv = "${name}.ldsc.heritability.tsv"
+    File fig = "${name}.ldsc.heritability.pdf"
+    }
+
+    runtime {
+      docker: "${final_docker}"
+      cpu: 2
+      memory: "4 GB"
+      disks: "local-disk 20 HDD"
+      zones: "europe-west1-b"
+      preemptible: 2
+      noAddress: true
+}
+
+
+
+
+}
 
 task filter_sumstats{
 
@@ -201,6 +244,8 @@ task return_couples {
   Int chunks
 
   String docker
+  String? couples_docker
+  String? final_docker = if defined(couples_docker) then couples_docker else docker
 
   command <<<
 
@@ -238,7 +283,7 @@ task return_couples {
   runtime {
       docker: "${docker}"
       cpu: 2
-      memory: "2 GB"
+      memory: "4 GB"
       disks: "local-disk 10 HDD"
       zones: "europe-west1-b"
       preemptible: 2

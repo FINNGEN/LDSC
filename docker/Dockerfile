@@ -9,5 +9,6 @@ RUN wget http://data.broadinstitute.org/alkesgroup/LDSCORE/eur_w_ld_chr.tar.bz2 
 
 RUN pip install pandas scipy bitarray
 
-RUN apt-get install python3 -y
+RUN apt-get install python3  python3-pip -y
+RUN pip3 install seaborn
 ADD scripts ../scripts/
