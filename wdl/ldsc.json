@@ -1,21 +1,22 @@
 {
-  "ldsc_rg.test": False,
-  "ldsc_rg.meta_fg": "gs://r7_data/ldsc/sumstats_munged.txt",
-  #"ldsc_rg.meta_fg": "gs://r7_data/ldsc/test_data.txt",
-  "ldsc_rg.meta_comparison": "gs://r7_data/ldsc/prs_data.txt",
-  "ldsc_rg.snplist": "gs://r7_data/snplist/w_hm3.snplist",
-  "ldsc_rg.ldsc_args": " '--ref-ld-chr /eur_w_ld_chr/ --w-ld-chr /eur_w_ld_chr/' ",
+  "ldsc_rg.docker": "eu.gcr.io/finngen-refinery-dev/ldsc:10",
+  #"ldsc_rg.meta_fg": "gs://r7_data/ldsc/sumstats_munged.txt",
+  "ldsc_rg.meta_fg": "gs://r7_data/ldsc/test_data_2.txt",
+  #"ldsc_rg.comparison_fg": "gs://r7_data/ldsc/test_data_2.txt",
   "ldsc_rg.name": "finngen_R7",
-  "ldsc_rg.docker": "eu.gcr.io/finngen-refinery-dev/ldsc:9",
+  "ldsc_rg.ldsc_args": " '--ref-ld-chr /eur_w_ld_chr/ --w-ld-chr /eur_w_ld_chr/' ",
 
-  # split inputs
-  "ldsc_rg.return_couples.chunks": 50,
+  # FILTER CHUNKS
+  "ldsc_rg.filter_meta.filter_chunks": 50,
+
+  #MUNGE
+  "ldsc_rg.munge_ldsc.snplist": "gs://r7_data/snplist/w_hm3.snplist",
+  "ldsc_rg.return_couples.chunks": 10,
+
   # multi inputs:
-  "ldsc_rg.multi_rg.cpus": 95,
-
+  "ldsc_rg.multi_rg.cpus": 16,
   #DOCKERS
-  #"ldsc_rg.return_couples.docker": "eu.gcr.io/finngen-refinery-dev/ldsc:2",
-  #"ldsc_rg.multi_rg.multi_docker": "eu.gcr.io/finngen-refinery-dev/ldsc:rg.2",
-  #"ldsc_rg.gather_summaries.gather_docker": "eu.gcr.io/finngen-refinery-dev/ldsc:gather.2",
-  #"ldsc_rg.gather_h2.gather_docker": "eu.gcr.io/finngen-refinery-dev/ldsc:gather.2",
+  "ldsc_rg.munge_ldsc.munge_docker": "eu.gcr.io/finngen-refinery-dev/ldsc:12",
+  "ldsc_rg.munge_ldsc.multi_rg": "eu.gcr.io/finngen-refinery-dev/ldsc:13",
+
 }

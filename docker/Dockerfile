@@ -11,4 +11,6 @@ RUN pip install pandas scipy bitarray
 
 RUN apt-get install python3  python3-pip -y
 RUN pip3 install seaborn
+RUN apt-get install jq -y
+
 ADD scripts ../scripts/

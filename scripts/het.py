@@ -2,13 +2,13 @@ import os,argparse,re,json
 from utils import make_sure_path_exists,tmp_bash
 
 
-def h2(ldsc_path,args,sumstats,out_path):
+def h2(ldsc_path,args,sumstats,out_path,debug):
 
     pheno = os.path.basename(sumstats).split(".ldsc")[0]
     out_file = f"{os.path.join(out_path,pheno + '.ldsc.h2')}"
-    print(sumstats,pheno)
-    cmd = f"{ldsc_path} {args} --h2  {sumstats} --out {out_file}"
-    print(cmd)
+    if debug:print(sumstats,pheno)
+    cmd = f"{ldsc_path} {args} --h2  {sumstats} --out {out_file} "
+    if debug:print(cmd)
     tmp_bash(cmd,True)
 
     log_file = out_file+ ".log"
@@ -41,9 +41,8 @@ if __name__ == '__main__':
     parser.add_argument("--sumstats",help = "Sumstats file",required = True,type = str)
     parser.add_argument("--args",help = "ldsc args",required = True,type = str)
     parser.add_argument("-o",help ="Out path")
-
+    parser.add_argument("--debug",action="store_true")
     args = parser.parse_args()
-    print(args)
     make_sure_path_exists(args.o)
-
-    h2(args.ldsc_path,args.args,args.sumstats,args.o)
+    if args.debug:print(args)
+    h2(args.ldsc_path,args.args,args.sumstats,args.o,args.debug)

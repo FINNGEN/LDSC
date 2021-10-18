@@ -12,7 +12,7 @@ workflow munge_fg {
 
     scatter (a in fg_meta) {
         call munge {
-            input: docker=docker, pheno=a[0], sumstats=a[1], n=a[2]
+            input: docker=docker, pheno=a[0], sumstats=a[1]
             }
       }
 
@@ -23,7 +23,6 @@ task munge {
 
   String pheno
   File sumstats
-  Int n
   String docker
   Int file_size = 2*ceil(size(sumstats,"GB")) + 1
 

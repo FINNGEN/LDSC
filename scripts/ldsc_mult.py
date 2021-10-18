@@ -40,7 +40,10 @@ def return_file_couples(couples,file_list):
     with open(couples) as i:
         for line in i:
             pheno1,pheno2 = line.strip().split()
-            file_couples.append([pheno_file_dict[pheno1],pheno_file_dict[pheno2]])
+            if all([os.path.isfile(elem) for elem in [pheno1,pheno2]]):
+                file_couples.append([pheno1,pheno2])
+            else:
+                file_couples.append([pheno_file_dict[pheno1],pheno_file_dict[pheno2]])
 
     return file_couples
 
@@ -50,7 +53,6 @@ def multiproc(couples,args,cpus,out_path,ldsc_path):
 
     cmd = f"{ldsc_path} {args} --rg FILE1,FILE2 --out {os.path.join(out_path,'ldsc_')}"
     print(cmd)
-
 
     params = [[elem[0],elem[1],cmd] for elem in couples]
 
