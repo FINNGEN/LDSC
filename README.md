@@ -31,6 +31,8 @@ awk 'BEGIN{FS=OFS="\t"} {n=split($1,a,","); for(i=1;i<=n;i++) print a[i],$0}' | 
 cut -f1,3- | gzip > $PHENO.premunge.gz
 ```
 
+will do the trick.
+
 To simplify, one can simply run the `munge_fg.wdl` provided updating the ```munge_fg.meta_fg``` input file, which is a tsv that contains `PHENO\tPATH`:
 ```
 C3_BREAST_EXALLC	gs://finngen-production-library-green/finngen_R5/finngen_R5_analysis_data/summary_stats/release/finngen_R5_C3_BREAST_EXALLC.gz
@@ -65,7 +67,10 @@ I9_MI_STRICT	204766	11909	192857	19800
 J10_ASTHMA	160321	21128	139193	64245
 ```
 
-One can then easily use the `join` command to build the table.
+One can then easily use the `join` command to build the table.E.g.
+`while read f; do PHENO=$(basename $f .premunge.gz) && echo -e "$PHENO\t$f" | join - <(cut -f 1,2 counts.txt); done < flagship_paths_munged.txt > input_meta.txt`
+
+
 
 ## WDL time!
 
