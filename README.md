@@ -71,7 +71,6 @@ One can then easily use the `join` command to build the table.E.g.
 `while read f; do PHENO=$(basename $f .premunge.gz) && echo -e "$PHENO\t$f" | join - <(cut -f 1,2 counts.txt); done < flagship_paths_munged.txt > input_meta.txt`
 
 
-
 ## WDL time!
 
 Now all the data is ready to run the big run. A brief summary of the logic of the wdl.
