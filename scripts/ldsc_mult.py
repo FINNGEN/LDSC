@@ -49,9 +49,9 @@ def return_file_couples(couples,file_list):
 
 
 
-def multiproc(couples,args,cpus,out_path,ldsc_path):
+def multiproc(couples,ld_path,args,cpus,out_path,ldsc_path):
 
-    cmd = f"{ldsc_path} {args} --rg FILE1,FILE2 --out {os.path.join(out_path,'ldsc_')}"
+    cmd = f"{ldsc_path} --ref-ld-chr {ld_path} --w-ld-chr {ld_path} {args} --rg FILE1,FILE2 --out {os.path.join(out_path,'ldsc_')}"
     print(cmd)
 
     params = [[elem[0],elem[1],cmd] for elem in couples]
@@ -87,7 +87,7 @@ def main(args):
         couples = return_file_couples(args.couples,args.list)
 
     #for elem in couples:print('\t'.join([os.path.basename(f) for f in elem]))
-    multiproc(couples,args.args,args.cpus,args.o,args.ldsc_path)
+    multiproc(couples,args.ld_path,args.args,args.cpus,args.o,args.ldsc_path)
 
 
 if __name__ == '__main__':
@@ -97,8 +97,10 @@ if __name__ == '__main__':
     parser.add_argument('--couples',help ='List of couples to be analyzed using basenames of files')
 
     parser.add_argument('--ldsc-path',help ='Path to ldsc path', required = False, default = 'ldsc.py')
+    parser.add_argument('--ld-path',help ='Path to ld ref scores', required = True)
+   
     parser.add_argument("-o",help ="Out path")
-    parser.add_argument("--args",help = "ldsc args",required = True,type = str)
+    parser.add_argument("--args",help = "ldsc args",type = str,default ="")
     parser.add_argument("--cpus",type = int, help = "number of cpus to use", default =  multiprocessing.cpu_count())
 
     args = parser.parse_args()

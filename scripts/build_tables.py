@@ -1,5 +1,5 @@
 from utils import tmp_bash,progressBar
-import argparse,gzip,os
+import argparse,gzip,os,multiprocessing,time
 import pandas as pd
 
 def return_shared_phenos(endpoints,sumstats):
@@ -19,40 +19,37 @@ def return_shared_phenos(endpoints,sumstats):
     return sorted(shared)
 
 
-def filter_dataframe(endpoints,shared_phenos,out_path):
+def read_pheno(pheno,endpoints,test):
+    nrows = 100 if test else None
+    df = pd.read_csv(endpoints,sep='\t',usecols = [pheno],nrows=nrows,dtype=pd.Int64Dtype()).fillna(2)
+    count_dict = {0:0,1:0,2:0}
+    for key,val in df[pheno].value_counts().to_dict().items():count_dict[key] = val
+    return '\t'.join(map(str,[count_dict[0],count_dict[1],count_dict[2]])) + '\n'
 
-    out_path = out_path + 'shared.csv'
-    if not os.path.isfile(out_path):
-        df = pd.read_csv(endpoints,sep='\t',usecols = shared_phenos)
-        df.to_csv(out_path,sep='\t',index = False)
-        print("data imported.")
-    else:
-        print(f"{out_path} already exists")
-    return out_path
+def wrapper_read(iter):
+    return read_pheno(*iter)
 
-def count(endpoints,shared_phenos,test,out_path):
-    """
-    Function that creates tables of cases/controls/nas for phenotypes
-    """
-    nrows = 1000 if test else None
-    cols = shared_phenos[:10] if test else shared_phenos
-    df = pd.read_csv(endpoints,nrows = nrows,sep='\t',usecols = cols)
-    print("data imported.")
-    samples = int(len(df))
-    with open(out_path + "counts.txt",'wt') as o:
-        for i,pheno in enumerate(cols):
-            progressBar(i,len(cols))
-            p_data = df[pheno]
-            nas = int(samples - p_data.count())
-            cases = int(p_data.sum())
-            controls = int(samples - nas - cases)
-            o.write('\t'.join(map(str,[pheno,cases+controls,cases,controls,nas])) + '\n')
-    progressBar(1,1)
-    print('\ndone.')
+def write_results(out_path,results):
+    with open(os.path.join( out_path,"counts.txt"),'wt') as o:
+        for entry in results:
+            o.write(entry)
+
 
 def main(args):
+    shared_phenos = return_shared_phenos(args.endpoints,args.sumstats)
+    params = [(pheno,args.endpoints,args.test) for pheno in shared_phenos]
+    pool = multiprocessing.Pool(multiprocessing.cpu_count())
+    results = pool.map_async(wrapper_read,params,chunksize=1)
+    while not results.ready():
+        time.sleep(2)
+        progressBar(len(params) - results._number_left,len(params))
 
-    return None
+    progressBar(len(params) - results._number_left,len(params))
+    print('\ndone.')
+    results = results.get()
+    pool.close()
+    write_results(args.out_path,results)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Manipulation of sumstats for building tables required by LDSC.")
@@ -63,6 +60,4 @@ if __name__ == "__main__":
 
 
     args = parser.parse_args()
-    shared_phenos = return_shared_phenos(args.endpoints,args.sumstats)
-    new_endpoints = filter_dataframe(args.endpoints,shared_phenos,args.out_path)
-    count(new_endpoints,shared_phenos,args.test,args.out_path)
+    main(args)

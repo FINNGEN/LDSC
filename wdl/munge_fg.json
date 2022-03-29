@@ -1,5 +1,6 @@
 {
   "munge_fg.test": False,
-  "munge_fg.docker": "gcr.io/finngen-refinery-dev/ldsc:1",
-  "munge_fg.meta_fg": "gs://r8_data/ldsc/flagship_munge.tsv"
+  "munge_fg.docker": "eu.gcr.io/finngen-refinery-dev/ldsc:10",
+  "munge_fg.meta_fg": "gs://r8_data/ldsc/r8_munge.txt"
   }
+`

@@ -7,16 +7,13 @@ import matplotlib as mpl
 from pathlib import Path
 from utils import make_sure_path_exists
 
-def read_data(f,columns):
-    df = pd.read_csv(f,sep='\t',index_col =[0],usecols = columns).dropna()
-    return df
-
 
 def plot_data(het,columns,fig_path):
     pylab.ioff()
 
     # SET UP FIG
-    df = read_data(het,columns)
+    df = pd.read_csv(het,sep='\t',index_col =[0],usecols =["PHENO"] + columns).dropna()
+    print(df.head())
 
     g = sns.JointGrid(data=df,x = columns[0],y=columns[1])
     g.plot_joint(sns.scatterplot,s=20, alpha=.5)
@@ -31,7 +28,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description ="Plot het.")
     parser.add_argument('--het',help ='het tsv file', required = True)
-    parser.add_argument('--columns',nargs=2,help ='what to plot', default =["INT","RATIO"])
+    parser.add_argument('--columns',nargs = 2,help ='what to plot', default =["INT","RATIO"])
     parser.add_argument("-o",help ="Out path",default = ".")
     args = parser.parse_args()
     make_sure_path_exists(args.o)
