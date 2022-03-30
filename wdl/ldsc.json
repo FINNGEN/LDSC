@@ -1,8 +1,13 @@
 {
     "ldsc_rg.docker": "eu.gcr.io/finngen-refinery-dev/ldsc:ld.1",
+    # sandbox docker
+    "ldsc_rg.docker": "eu.gcr.io/finngen-sandbox-v3-containers/ldsc:ld.1",
     "ldsc_rg.meta_fg": "gs://r8_data/ldsc/r8_metadata.txt",
+    #optional second list (if absent the first will be used instead )
     #"ldsc_rg.comparison_fg": "gs://r7_data/ldsc/test_data_2.txt",
+    # output prefic
     "ldsc_rg.name": "finngen_R8",
+    # choose LD score population
     "ldsc_rg.population" : "FIN",
     "ldsc_rg.ld_path":{"EUR":"gs://finngen-production-library-green/ldsc/eur_ld.txt","FIN":"gs://finngen-production-library-green/ldsc/fin_ld.txt"},
 
@@ -16,6 +21,7 @@
     
     #multi inputs:
     "ldsc_rg.multi_rg.cpus": 32,
+    # optional inputs for ldsc
     #"ldsc_rg.multi_rg.args" : ""
 
     #DOCKERS
