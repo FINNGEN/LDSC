@@ -96,6 +96,6 @@ AB1_AMOEBIASIS	AB1_ASPERGILLOSIS	0.7488	0.9701	0.7719	0.4402	0.0019	0.0016	0.981
 
 ### Other inputs
 
-The choice of LD scores to be used is between the default European 1kg and the custom built Finngen one. This can be chosen in the json inputs by selection ``` "ldsc_rg.population" ``` as being either ```EUR|FIN``` as the ```ld_path``` dictionary will automatically download the desired files.
+The choice of LD scores to be used is between the default European 1kg and the custom built Finngen one. This can be chosen in the json inputs by selection ``` "ldsc_rg.population" ``` as being either ```eur|fin``` as the ```ld_path``` root path will be  automatically updated to download the desired files.
 
 FInally, ```dsc_rg.multi_rg.args``` is an optional input that allows to add flags to the default ldsc command.
