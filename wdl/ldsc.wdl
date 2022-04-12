@@ -1,16 +1,24 @@
+version 1.0
+
 workflow ldsc_rg {
 
-  File meta_fg
-  File? comparison_fg
-  File? meta_other = if defined(comparison_fg) then comparison_fg else meta_fg
 
-  String docker
-  String name
+  input {
+    File meta_fg
+    File? comparison_fg
+    File meta_other = if defined(comparison_fg) then comparison_fg else meta_fg
 
-  String population
-  Map[String,File] ld_path
+    String docker
+    String name
+    
+    String population
+    Map[String,File] ld_path
+
+  }
+
   File ld_list = ld_path[population]
   String final_name = name + "_" + population
+  
   
   # merge sumstats keeping unique values across them and creating munge chunks
   call filter_meta {input: meta_fg = meta_fg,meta_other = meta_other, docker = docker}
@@ -39,51 +47,48 @@ workflow ldsc_rg {
 
 task multi_rg {
 
-  File couples
-  File paths_list
+  input {
+    File couples
+    File paths_list
+    File ld_list
+    String name
+    Int cpus
+    Int jobs
+    String docker
+    String? args
+  }
   Array[File] sumstats = read_lines(paths_list)
-
-
-  File ld_list
   Array[File] ld_files = read_lines(ld_list)
-  String? args
-  String dollar = "$"
-  String name
-
-  Int cpus
-  Int jobs
+  
   Int final_cpus = if jobs > cpus then cpus else jobs
   Int mem = 2*cpus
-
   Int disk_size = 20 + ceil(size(sumstats[0],"MB")*length(sumstats)/1000)
 
-  String docker
-  String? multi_docker
-  String? final_docker = if defined(multi_docker) then multi_docker else docker
+  
 
   command <<<
-    echo ${disk_size} ${final_cpus} ${jobs}
+    echo ~{disk_size} ~{final_cpus} ~{jobs}
     # get ld_path from first file in ld file list
-    ld_path="${dollar}(dirname ${ld_files[0]})/"
-    cat ${write_lines(sumstats)} > sumstats.txt &&  wc -l sumstats.txt
-    cat ${couples} > couples.txt
+    ld_path="$(dirname ~{ld_files[0]})/"
+    cat ~{write_lines(sumstats)} > sumstats.txt &&  wc -l sumstats.txt
+    cat ~{couples} > couples.txt
 
     python3 /scripts/ldsc_mult.py \
     --ldsc-path "ldsc.py" \
     --list sumstats.txt   \
     --couples couples.txt \
     -o /cromwell_root/results/ \
-    --ld-path ${dollar}ld_path \
-    ${if defined(args) then "--args " + args else ""}
+    --ld-path $ld_path \
+    ~{if defined(args) then "--args " + args else ""}
     
 
    for f in /cromwell_root/results/*log; do echo $f >> summaries.txt ; done
-   while read f; do cat $f >> ${name}.log ; done < summaries.txt
+   while read f; do cat $f >> ~{name}.log ; done < summaries.txt
    cat summaries.txt
 
    python3 /scripts/extract_metadata.py \
    --summaries summaries.txt \
-   --name ${name}
+   --name ~{name}
 
   >>>
 
@@ -93,7 +98,7 @@ task multi_rg {
   }
 
   runtime {
-      docker: "${final_docker}"
+      docker: "${docker}"
       cpu: "${final_cpus}"
       memory: "${mem} GB"
       disks: "local-disk ${disk_size} HDD"
@@ -105,31 +110,30 @@ task multi_rg {
 
 task return_couples {
 
-  File file1
-  File file2
+  input {
+    File file1
+    File file2
+    Int chunks
+    String docker
+    Array[Array[String]] munged_chunks
+  }
+  
   Array[Array[String]] list1 = read_tsv(file1)
   Array[Array[String]] list2 = read_tsv(file2)
-  Int chunks
-
-  String docker
-  String? couples_docker
-  String? final_docker = if defined(couples_docker) then couples_docker else docker
-
-  Array[Array[String]] munged_chunks
   Array[String] munged_sumstats = flatten(munged_chunks)
 
   command <<<
 
   # write to file all absolute paths of sumstats
-  cat ${write_lines(munged_sumstats)} > path_list.txt
+  cat ~{write_lines(munged_sumstats)} > path_list.txt
 
   python3 <<CODE
 
   import itertools,os
 
   # open input pheno lists
-  with open('${write_tsv(list1)}') as i: first_list = [elem.strip().split()[0] for elem in i.readlines()]
-  with open('${write_tsv(list2)}') as i: second_list = [elem.strip().split()[0] for elem in i.readlines()]
+  with open('~{write_tsv(list1)}') as i: first_list = [elem.strip().split()[0] for elem in i.readlines()]
+  with open('~{write_tsv(list2)}') as i: second_list = [elem.strip().split()[0] for elem in i.readlines()]
 
   #create all possible combinations
   couples = itertools.product(list(set(first_list)),list(set(second_list)))
@@ -140,7 +144,7 @@ task return_couples {
   print(len(second_list))
   print(len(sorted_couples))
   # return subchunks
-  n = 1 + len(sorted_couples)//${chunks}
+  n = 1 + len(sorted_couples)//~{chunks}
   sublists = [sorted_couples[i:i + n] for i in range(0, len(sorted_couples), n)]
 
   # create pheno to file mapping
@@ -185,7 +189,15 @@ task return_couples {
 
 task munge_ldsc{
 
-  File chunk
+  input {
+    File chunk
+    String docker
+    File snplist
+    String? args    
+    File ld_list
+
+    }
+    
   Array[Array[String]] by_type = transpose(read_tsv(chunk))
   Array[String] phenos = by_type[0]
   Array[File] fnames = by_type[1]
@@ -193,34 +205,26 @@ task munge_ldsc{
 
   Int disk_size = 2 + ceil(size(fnames[0],'GB')) * length(fnames)
   
-  String docker
-  String? munge_docker
-  String? final_docker = if defined(munge_docker) then munge_docker else docker
-  File snplist
-
-  File ld_list
   Array[File] ld_files = read_lines(ld_list)
-  String? args
-  String dollar = "$"
   
   command <<<
 
     df -h .
     # rebuild the original tsv with metadata but now localized filepaths and add line number
-    paste -d '\t' ${write_lines(phenos)} ${write_lines(fnames)} ${write_lines(ns)} | nl --number-format=rn --number-width=2  > meta.txt
+    paste -d '\t' ~{write_lines(phenos)} ~{write_lines(fnames)} ~{write_lines(ns)} | nl --number-format=rn --number-width=2  > meta.txt
     wc -l meta.txt
 
 
     # get ld_path from first file in ld file list
-    ld_path="${dollar}(dirname ${ld_files[0]})/"
-    echo ${dollar}ld_path
+    ld_path="$(dirname ~{ld_files[0]})/"
+    echo $ld_path
     
     # read through file and munge it + calculate heritability
-    while read line ; do arr=(${dollar}line) && echo -ne "\r${dollar}{arr[0]}/${length(phenos)} ${dollar}{arr[1]}                  "
-    munge_sumstats.py  --sumstats ${dollar}{arr[2]}  \
-    --N ${dollar}{arr[3]} --out ${dollar}{arr[1]}.ldsc  --merge-alleles ${snplist} 1> /dev/null && \
+    while read line ; do arr=($line) && echo -ne "\r${arr[0]}/~{length(phenos)} ${arr[1]}                  "
+    munge_sumstats.py  --sumstats ${arr[2]}  \
+    --N ${arr[3]} --out ${arr[1]}.ldsc  --merge-alleles ~{snplist} 1> /dev/null && \
     python3 /scripts/het.py  --ldsc-path "ldsc.py" \
-    --sumstats ${dollar}{arr[1]}.ldsc.sumstats.gz --ld-path ${dollar}ld_path ${if defined(args) then "--args " + args else ""} -o . 1> /dev/null ;
+    --sumstats ${arr[1]}.ldsc.sumstats.gz --ld-path $ld_path ~{if defined(args) then "--args " + args else ""} -o . 1> /dev/null ;
     done < meta.txt
 
     # merge log files
@@ -238,7 +242,7 @@ task munge_ldsc{
 
   }
   runtime {
-      docker: "${final_docker}"
+      docker: "${docker}"
       cpu: 1
       memory: "4 GB"
       disks: "local-disk ${disk_size} HDD"
@@ -250,17 +254,18 @@ task munge_ldsc{
 
 task filter_meta {
 
-  File meta_fg
-  File meta_other
-  String docker
-  Int filter_chunks
-
+  input {
+    File meta_fg
+    File meta_other
+    String docker
+    Int filter_chunks
+  }
   command <<<
-  cat ${meta_fg} > tmp.txt
-  cat ${meta_other} >> tmp.txt
+  cat ~{meta_fg} > tmp.txt
+  cat ~{meta_other} >> tmp.txt
 
   sort tmp.txt | uniq >> meta.txt
-  split -n r/${filter_chunks} -d --additional-suffix=.txt meta.txt chunk
+  split -n r/~{filter_chunks} -d --additional-suffix=.txt meta.txt chunk
 
   >>>
 
@@ -278,25 +283,23 @@ task filter_meta {
 
 task gather_summaries {
 
-  Array[File] summaries
-  Array[File] logs
-  String name
+  input {
+    Array[File] summaries
+    Array[File] logs
+    String name
+    String docker
+  }
+
   Int disk_size = ceil(size(summaries[0],'MB')*length(summaries)) + ceil(size(logs[0],'MB')*length(logs))
-
   Int final_disk_size = ceil(disk_size/1000) + 50
-
-  String docker
-  String? gather_docker
-  String? final_docker = if defined(gather_docker) then gather_docker else docker
-
 
   command <<<
 
   df -h .
-  while read f; do cat $f >> ${name}.ldsc.logs.txt ; done < ${write_lines(logs)}
+  while read f; do cat $f >> ~{name}.ldsc.logs.txt ; done < ~{write_lines(logs)}
 
-  head -n1 ${summaries[0]} > ${name}.ldsc.summary.tsv
-  while read f; do cat $f | sed -E 1d >> ${name}.ldsc.summary.tsv ; done < ${write_lines(summaries)}
+  head -n1 ~{summaries[0]} > ~{name}.ldsc.summary.tsv
+  while read f; do cat $f | sed -E 1d >> ~{name}.ldsc.summary.tsv ; done < ~{write_lines(summaries)}
   >>>
 
   output {
@@ -305,7 +308,7 @@ task gather_summaries {
   }
 
   runtime {
-      docker: "${final_docker}"
+      docker: "${docker}"
       cpu: 2
       memory: "4 GB"
       disks: "local-disk ${final_disk_size} HDD"
@@ -317,27 +320,26 @@ task gather_summaries {
 
 task gather_h2{
 
-  Array[File] het_jsons
-  Array[File] het_log
-
-  String name
-  String docker
-  String? gather_docker
-  String? final_docker = if defined(gather_docker) then gather_docker else docker
-
-  String dollar = "$"
+  input {
+    Array[File] het_jsons
+    Array[File] het_log
+    
+    String name
+    String docker
+  }
+  
 
   command <<<
 
-  cat ${write_lines(het_jsons)} >> h2.txt
+  cat ~{write_lines(het_jsons)} >> h2.txt
 
   python3 /scripts/extract_metadata.py \
   --het h2.txt \
-  --name ${name}
+  --name ~{name}
 
-  while read f; do cat ${dollar}f >> ${name}.ldsc.heritability.log; done <  ${write_lines(het_log)}
+  while read f; do cat $f >> ~{name}.ldsc.heritability.log; done <  ~{write_lines(het_log)}
 
-  python3 /scripts/plot_summary.py  --het ${name}.ldsc.heritability.tsv  --columns INT RATIO
+  python3 /scripts/plot_summary.py  --het ~{name}.ldsc.heritability.tsv  --columns INT RATIO
 
   >>>
 
@@ -349,7 +351,7 @@ task gather_h2{
     }
 
     runtime {
-      docker: "${final_docker}"
+      docker: "${docker}"
       cpu: 2
       memory: "4 GB"
       disks: "local-disk 20 HDD"
