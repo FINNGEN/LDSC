@@ -10,7 +10,7 @@ Most of the work is done by the wdl itself, but some preprocessing steps are nee
 ## Preprocressing
 ### Step1 - Munge data
 
-In this step we need to make sure that the input sumstats are coherent with the requirements by ldsc for its own munging step.
+In this step we need to make sure that input sumstats are coherent with the requirements by ldsc for its own munging step.
 
 The required input format is as follows:
 ```
