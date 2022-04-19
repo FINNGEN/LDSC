@@ -1,6 +1,6 @@
 # LDSC
 
-Wrapper pipeline based on https://github.com/bulik/ldsc
+Wrapper pipeline based on https://github.com/bulik/ldsc.
 
 Most of the work is done by the wdl itself, but some preprocessing steps are needed, mainly due to the fact that the nature of the input sumstats can be different.
 
