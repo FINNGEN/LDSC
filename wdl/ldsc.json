@@ -1,0 +1,30 @@
+{
+    "ldsc_rg.docker": "eu.gcr.io/finngen-refinery-dev/ldsc:ld.1",
+    #"ldsc_rg.meta_fg": "gs://r8_data/ldsc/r8_metadata.txt",
+    "ldsc_rg.meta_fg": "gs://r7_data/ldsc/test_data_2.txt",
+    #optional second list (if absent the first will be used instead )
+    #"ldsc_rg.comparison_fg": "gs://r7_data/ldsc/test_data_2.txt",
+    # output prefix
+    "ldsc_rg.name": "finngen_R8",
+    # choose LD score population
+    "ldsc_rg.population" : "FIN",
+    "ldsc_rg.ld_path":{"EUR":"gs://finngen-production-library-green/ldsc/eur_ld.txt","FIN":"gs://finngen-production-library-green/ldsc/fin_ld.txt"},
+
+
+    #FILTER CHUNKS
+    "ldsc_rg.filter_meta.filter_chunks": 50,
+
+    #MUNGE
+    "ldsc_rg.munge_ldsc.snplist": "gs://finngen-production-library-green/ldsc/w_hm3.snplist",
+    "ldsc_rg.return_couples.chunks": 100,
+    
+    #multi inputs:
+    "ldsc_rg.multi_rg.cpus": 32,
+    # optional inputs for ldsc
+    #"ldsc_rg.multi_rg.args" : ""
+
+    #DOCKERS
+    #"ldsc_rg.munge_ldsc.munge_docker": "eu.gcr.io/finngen-refinery-dev/ldsc:14",
+    # "ldsc_rg.munge_ldsc.multi_rg": "eu.gcr.io/finngen-refinery-dev/ldsc:13",
+
+}
