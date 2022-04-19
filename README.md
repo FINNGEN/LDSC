@@ -13,6 +13,7 @@ Most of the work is done by the wdl itself, but some preprocessing steps are nee
 In this step we need to make sure that input sumstats are coherent with the requirements by ldsc for its own munging step.
 
 The required input format is as follows:
+
 ```
 SNP	A1	A2	BETA	P
 rs74337086	A	G	0.0923	0.5059
