@@ -18,14 +18,13 @@ workflow munge_fg {
       }
 }
 
-
 task munge {
   input {
     String pheno
     File sumstats
     String docker
     }
-    Int file_size = 2*ceil(size(sumstats,"GB")) + 1
+    Int file_size = 2*ceil(size(sumstats,"GB")) + 2
 
   command <<<
 
