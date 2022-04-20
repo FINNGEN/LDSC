@@ -69,7 +69,7 @@ J10_ASTHMA	160321	21128	139193	64245
 ```
 
 One can then easily use the `join` command to build the table.E.g.
-`while read f; do PHENO=$(basename $f .premunge.gz) && echo -e "$PHENO\t$f" | join - <(cut -f 1,2 counts.txt); done < flagship_paths_munged.txt > input_meta.txt`
+`while read f; do PHENO=$(basename $f .premunge.gz) && echo -e "$PHENO\t$f" | join - -t $'\t' <(cut -f 1,2 counts.txt); done < flagship_paths_munged.txt > input_meta.txt`
 
 
 ## WDL time!

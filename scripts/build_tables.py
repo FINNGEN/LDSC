@@ -1,5 +1,6 @@
 from utils import tmp_bash,progressBar
 import argparse,gzip,os,multiprocessing,time
+from collections import Counter,defaultdict
 import pandas as pd
 
 def return_shared_phenos(endpoints,sumstats):
@@ -21,10 +22,13 @@ def return_shared_phenos(endpoints,sumstats):
 
 def read_pheno(pheno,endpoints,test):
     nrows = 100 if test else None
+    # read in data, casting NAs as 2s so we can reognize them
     df = pd.read_csv(endpoints,sep='\t',usecols = [pheno],nrows=nrows,dtype=pd.Int64Dtype()).fillna(2)
-    count_dict = {0:0,1:0,2:0}
-    for key,val in df[pheno].value_counts().to_dict().items():count_dict[key] = val
-    return '\t'.join(map(str,[count_dict[0],count_dict[1],count_dict[2]])) + '\n'
+    
+    count_dict = defaultdict(int)
+    counter = Counter(df[pheno])
+    count_dict.update(dict(counter))                      
+    return '\t'.join(map(str,[pheno,count_dict[0],count_dict[1],count_dict[2]])) + '\n'
 
 def wrapper_read(iter):
     return read_pheno(*iter)
