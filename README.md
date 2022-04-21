@@ -78,6 +78,8 @@ Now all the data is ready to run the big run. A brief summary of the logic of th
 
 As input one cane have two lists of sumstats or just one. If two are provided then all the cross scores are computed between the two lists. If only one is passed instead the first list is duplicated as a second, thus running an inner product on itself. The total number of comparison that needs to run is `N*L/2` jobs to be run where `N` and `L` are the lengths of the two lists. In case of inner product, the number is `N(N-1)/2` instead. This means that the growht is quadratic and thus I recommed first testing the pipeline with a smaller set of sumstats.
 
+In the `ldsc_sandbox.json` file the comparison list is by default a test (10 phenotypes) version with the latest (r9) data. Please run first in test mode and once sure that everything works, remove the suffix `_test` and you can run the full version.
+
 `filter_meta` splits the input lists into chunks for munging. The number of chunks in this step is given by `  "ldsc_rg.filter_meta.filter_chunks": Int`. This step is quite fast anyways and, in principle, should only run once since its output is cached.
 
 Each input chunk list is passed to `munge_ldsc`. In this step, the input sumstats are munged by ldsc directly and, while we're at it, the heritability is calculated. The outputs of the heritability calculation are passed to `gather_h2` which builds an output table and json with all the summaries, as well as merging all the logs.

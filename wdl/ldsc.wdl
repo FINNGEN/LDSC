@@ -227,6 +227,7 @@ task munge_ldsc{
     --sumstats ${arr[1]}.ldsc.sumstats.gz --ld-path $ld_path ~{if defined(args) then "--args " + args else ""} -o . 1> /dev/null ;
     done < meta.txt
 
+    ls 
     # merge log files
     cat *ldsc.log >> munge.log &&  cat *ldsc.h2.log >> het.log
 
@@ -260,12 +261,13 @@ task filter_meta {
     String docker
     Int filter_chunks
   }
+
   command <<<
   cat ~{meta_fg} > tmp.txt
   cat ~{meta_other} >> tmp.txt
 
   sort tmp.txt | uniq >> meta.txt
-  split -n r/~{filter_chunks} -d --additional-suffix=.txt meta.txt chunk
+  split -edn r/~{filter_chunks} --additional-suffix=.txt meta.txt chunk
 
   >>>
 

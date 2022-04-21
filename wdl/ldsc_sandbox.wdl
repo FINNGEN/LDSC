@@ -259,11 +259,11 @@ task filter_meta {
     Int filter_chunks
   }
   command <<<
-  cat ~{meta_fg} > tmp.txt
-  cat ~{meta_other} >> tmp.txt
-
-  sort tmp.txt | uniq >> meta.txt
-  split -n r/~{filter_chunks} -d --additional-suffix=.txt meta.txt chunk
+    cat ~{meta_fg} > tmp.txt
+    cat ~{meta_other} >> tmp.txt
+    
+    sort tmp.txt | uniq >> meta.txt
+    split -edn r/~{filter_chunks} --additional-suffix=.txt meta.txt chunk
 
   >>>
 
