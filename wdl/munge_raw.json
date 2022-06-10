@@ -1,0 +1,5 @@
+{
+    "munge_raw.docker": "eu.gcr.io/finngen-refinery-dev/ldsc:10",
+    "munge_raw.sumstats_loc": "gs://r9-data/drugs/r9_drugs_sumstats",
+    "munge_raw.munge.annotation": "gs://finngen-production-library-green/finngen_R9/finngen_R9_analysis_data/annotations/R9_annotated_variants_rsid_enrichment_small.gz"
+}
