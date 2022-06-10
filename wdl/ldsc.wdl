@@ -102,7 +102,7 @@ task multi_rg {
       cpu: "${final_cpus}"
       memory: "${mem} GB"
       disks: "local-disk ${disk_size} HDD"
-      zones: "europe-west1-b"
+      zones: "europe-west1-b europe-west1-c europe-west1-d"
       preemptible: 2
       noAddress: true
   }
@@ -181,7 +181,7 @@ task return_couples {
       cpu: 2
       memory: "4 GB"
       disks: "local-disk 10 HDD"
-      zones: "europe-west1-b"
+      zones: "europe-west1-b europe-west1-c europe-west1-d"
       preemptible: 2
       noAddress: true
   }
@@ -246,7 +246,7 @@ task munge_ldsc{
       cpu: 1
       memory: "4 GB"
       disks: "local-disk ${disk_size} HDD"
-      zones: "europe-west1-b"
+      zones: "europe-west1-b europe-west1-c europe-west1-d"
       preemptible: 2
       noAddress: true
   }
@@ -275,7 +275,7 @@ task filter_meta {
       cpu: 1
       memory: "4 GB"
       disks: "local-disk 10 HDD"
-      zones: "europe-west1-b"
+      zones: "europe-west1-b europe-west1-c europe-west1-d"
       preemptible: 2
       noAddress: true
   }
@@ -312,7 +312,7 @@ task gather_summaries {
       cpu: 2
       memory: "4 GB"
       disks: "local-disk ${final_disk_size} HDD"
-      zones: "europe-west1-b"
+      zones: "europe-west1-b europe-west1-c europe-west1-d"
       preemptible: 2
       noAddress: true
   }
@@ -355,7 +355,7 @@ task gather_h2{
       cpu: 2
       memory: "4 GB"
       disks: "local-disk 20 HDD"
-      zones: "europe-west1-b"
+      zones: "europe-west1-b europe-west1-c europe-west1-d"
       preemptible: 2
       noAddress: true
   }
