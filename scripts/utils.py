@@ -1,4 +1,4 @@
-import os,sys,subprocess
+import os,sys,subprocess,logging
 
 def make_sure_path_exists(path):
     import errno
@@ -49,3 +49,30 @@ def round_sig(x, sig=2):
         return str(int(0))
     else:
         return round(x, sig-int(floor(log10(abs(x))))-1)
+
+    
+def pretty_print(string,l = 30):
+    l = l-int(len(string)/2)
+    print('-'*l + '> ' + string + ' <' + '-'*l)
+def file_exists(fname):
+    '''
+    Function to pass to type in argparse
+    '''
+    if os.path.isfile(fname):
+        return str(fname)
+    else:
+        print(fname + ' does not exist')
+        sys.exit(1)
+ 
+
+log_levels = {
+    'critical': logging.CRITICAL,
+    'error': logging.ERROR,
+    'warn': logging.WARNING,
+    'warning': logging.WARNING,
+    'info': logging.INFO,
+    'debug': logging.DEBUG
+}
+
+
+
