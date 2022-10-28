@@ -1,11 +1,11 @@
 {
     "ldsc_rg.docker": "eu.gcr.io/finngen-refinery-dev/ldsc:ld.1",
-    #"ldsc_rg.meta_fg": "gs://r8_data/ldsc/r8_metadata.txt",
+    "ldsc_rg.only_het": True,
     "ldsc_rg.meta_fg": "gs://r7_data/ldsc/test_data_2.txt",
     #optional second list (if absent the first will be used instead )
     #"ldsc_rg.comparison_fg": "gs://r7_data/ldsc/test_data_2.txt",
     # output prefix
-    "ldsc_rg.name": "finngen_R8",
+    "ldsc_rg.name": "finngen_R10",
     # choose LD score population
     "ldsc_rg.population" : "FIN",
     "ldsc_rg.ld_path":{"EUR":"gs://finngen-production-library-green/ldsc/eur_ld.txt","FIN":"gs://finngen-production-library-green/ldsc/fin_ld.txt"},

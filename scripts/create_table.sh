@@ -1,17 +1,12 @@
 #!/bin/bash
 
-SS=$1
-COUNT=$2
+BUCKET=$1
+COUNTS=$2
 OUT=$3
-i=0
 
-rm -rf $OUT && touch $OUT
-N=$(wc -l < $SS)
+FIX_BUCKET=$(echo $BUCKET | sed 's:/*$::')
+rm -f meta_paths.txt
+while read f; do tmp=$(basename $f .premunge.gz) && b=$(basename $tmp .gz) && echo -e $b"\t"$f  >> meta_paths.txt; done < <(gsutil ls $FIX_BUCKET/**/*gz )
+join -t $'\t' <(sort -k1 meta_paths.txt) $COUNTS > $OUT
+rm -f meta_paths.txt
 
-while read f
-do
-    i=$((i+1))
-    printf "\r$i/$N"
-    PHENO=$(basename $f .gz)
-    echo -e "$PHENO\t$f" | join - -t $'\t' <(cut -f 1,2 $COUNT) >> $OUT
-done < $SS 
