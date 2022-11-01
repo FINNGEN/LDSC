@@ -1,14 +1,10 @@
 {
+    "ldsc_rg.docker": "eu.gcr.io/finngen-sandbox-v3-containers/ldsc:ld.1",
     "ldsc_rg.meta_fg": "gs://finngen-production-library-green/ldsc/test/test_metadata.txt", #
     #"ldsc_rg.comparison_fg": "gs://finngen-production-library-green/ldsc/r8_metadata.txt", #Finngen R8 FULL metatable
-    "ldsc_rg.docker": "eu.gcr.io/finngen-sandbox-v3-containers/ldsc:ld.1",
-    "ldsc_rg.name": "finngen_R10",
-
-    #LDSC GENERIC PARAMS (population)
+    "ldsc_rg.name": "finngen_test",
     "ldsc_rg.population" : "fin", #fin/eur
     "ldsc_rg.ld_root" : "gs://finngen-production-library-green/ldsc/POP_ld.txt",
-
-    #RG PARAMS
     "ldsc_rg.filter_meta.filter_chunks": 10,
     "ldsc_rg.munge_ldsc.snplist": "gs://finngen-production-library-green/ldsc/w_hm3.snplist",
     "ldsc_rg.return_couples.chunks": 20,
