@@ -269,7 +269,7 @@ task filter_meta {
   cat ~{meta_other} >> tmp.txt
 
   sort tmp.txt | uniq >> meta.txt
-  split -n r/~{filter_chunks} -d --additional-suffix=.txt meta.txt chunk
+  split -en r/~{filter_chunks} -d --additional-suffix=.txt meta.txt chunk
 
   >>>
 
