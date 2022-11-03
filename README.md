@@ -24,7 +24,7 @@ rs577189614	A	G	0.0845	0.5341
 rs77357188	T	C	-0.0414	0.3383
 ```
 
-For FG sumstats the command
+For FG sumstats (from pheweb) the command
 ```
 gunzip -c $SUMSTATS | \
 awk 'BEGIN{FS=OFS="\t"} NR==1{for(i=1;i<=NF;i++) a[$i]=i; print "SNP","A1","A2","BETA","P"}   NR>1 {if($a["rsids"]!="") print $a["rsids"],$a["alt"],$a["ref"],$a["beta"],$a["pval"]}' | \
