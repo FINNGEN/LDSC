@@ -24,7 +24,7 @@ rs577189614	A	G	0.0845	0.5341
 rs77357188	T	C	-0.0414	0.3383
 ```
 
-For FG sumstats the command
+For FG sumstats (from pheweb) the command
 ```
 gunzip -c $SUMSTATS | \
 awk 'BEGIN{FS=OFS="\t"} NR==1{for(i=1;i<=NF;i++) a[$i]=i; print "SNP","A1","A2","BETA","P"}   NR>1 {if($a["rsids"]!="") print $a["rsids"],$a["alt"],$a["ref"],$a["beta"],$a["pval"]}' | \
@@ -76,7 +76,9 @@ One can then easily use the `join` command to build the table.E.g.
 
 Now all the data is ready to run the big run. A brief summary of the logic of the wdl.
 
-As input one cane have two lists of sumstats or just one. If two are provided then all the cross scores are computed between the two lists. If only one is passed instead the first list is duplicated as a second, thus running an inner product on itself. The total number of comparison that needs to run is `N*L/2` jobs to be run where `N` and `L` are the lengths of the two lists. In case of inner product, the number is `N(N-1)/2` instead. This means that the growht is quadratic and thus I recommed first testing the pipeline with a smaller set of sumstats.
+The boolean flag "het_only" if set to True only produces heritabilities and does not compute genetic correlations. It's set to false by default, thus automatically calculating correlations. Please make sure it's your intention to do so.
+
+As input one can have two lists of sumstats or just one. If two are provided then all the cross scores are computed between the two lists. If only one is passed instead the first list is duplicated as a second, thus running an inner product on itself. The total number of comparison that needs to run is `N*L/2` jobs to be run where `N` and `L` are the lengths of the two lists. In case of inner product, the number is `N(N-1)/2` instead. This means that the growht is quadratic and thus I recommed first testing the pipeline with a smaller set of sumstats.
 
 `filter_meta` splits the input lists into chunks for munging. The number of chunks in this step is given by `  "ldsc_rg.filter_meta.filter_chunks": Int`. This step is quite fast anyways and, in principle, should only run once since its output is cached.
 

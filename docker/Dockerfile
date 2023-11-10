@@ -3,6 +3,7 @@ from ubuntu:18.04
 ENV PATH /ldsc:$PATH
 RUN apt-get update && apt-get install git wget -y
 
+# https://github.com/kkellysci/munge_small_pvals.git (version that can handle low pvals)
 RUN git clone https://github.com/bulik/ldsc.git
 
 RUN wget http://data.broadinstitute.org/alkesgroup/LDSCORE/eur_w_ld_chr.tar.bz2 && tar -xjf eur_w_ld_chr.tar.bz2 && \

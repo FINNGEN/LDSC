@@ -8,7 +8,7 @@ workflow ldsc_rg {
     File meta_fg
     File? comparison_fg
     File meta_other = if defined(comparison_fg) then comparison_fg else meta_fg
-
+    Boolean only_het
     String docker
     String name
     
@@ -25,19 +25,25 @@ workflow ldsc_rg {
   scatter (chunk in filter_meta.chunk_list){
     call munge_ldsc{input:docker = docker, chunk = chunk,ld_list = ld_list}
   }
-  # returns all valid couples of phenocodes that need to be run in terms of absolute paths from the output of the previous task
-  call return_couples { input : file1 = meta_fg,file2 = meta_other, munged_chunks = munge_ldsc.munged, docker = docker}
 
-  scatter (i in range(length(return_couples.couples))) {
-    # where the actual work is done
-    call multi_rg {input: couples=return_couples.couples[i], paths_list = return_couples.paths_list[i],jobs = return_couples.jobs, name = i, docker = docker,ld_list =ld_list}
+    # gather h2 data from munge step
+  call gather_h2{input: name = final_name,docker = docker,het_jsons = munge_ldsc.het_json,het_log= munge_ldsc.het_log}
+
+  # returns all valid couples of phenocodes that need to be run in terms of absolute paths from the output of the previous task
+
+  if (!only_het) {
+    call return_couples { input : file1 = meta_fg,file2 = meta_other, munged_chunks = munge_ldsc.munged, docker = docker}
+
+    scatter (i in range(length(return_couples.couples))) {
+      # where the actual work is done
+      call multi_rg {input: couples=return_couples.couples[i], paths_list = return_couples.paths_list[i],jobs = return_couples.jobs, name = i, docker = docker,ld_list =ld_list}
+    }
+
+    # gather all the outputs of multi_rg in order to create a final table
+    call gather_summaries {  input:   docker = docker,   name = final_name,   summaries = multi_rg.summary, logs = multi_rg.log   }
+
   }
 
-
-  # gather all the outputs of multi_rg in order to create a final table
-  call gather_summaries {  input:   docker = docker,   name = final_name,   summaries = multi_rg.summary, logs = multi_rg.log   }
-  # gather h2 data from munge step
-  call gather_h2{input: name = final_name,docker = docker,het_jsons = munge_ldsc.het_json,het_log= munge_ldsc.het_log}
 
 }
 
@@ -263,7 +269,7 @@ task filter_meta {
   cat ~{meta_other} >> tmp.txt
 
   sort tmp.txt | uniq >> meta.txt
-  split -n r/~{filter_chunks} -d --additional-suffix=.txt meta.txt chunk
+  split -en r/~{filter_chunks} -d --additional-suffix=.txt meta.txt chunk
 
   >>>
 
