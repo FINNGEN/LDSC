@@ -2,7 +2,6 @@ version 1.0
 
 workflow ldsc_rg {
 
-
   input {
     File meta_fg
     File? comparison_fg
