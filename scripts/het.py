@@ -27,21 +27,17 @@ def get_het(f,pheno):
     h2_dict = {pheno:["NA",'NA']}
     with open(f) as i:
         for line in i:
-            if ":" in line: tmpline = line.split(':')[1].replace("^2",'sq')
-
-            if "Total Observed scale h2" in line:#fins line with h2 data
+            # need to take only the part after ":" as i'm extracting numbers and there's a 2 in h2 that causes issues
+            tmpline = line.split(':')[1] if ":" in line else line
+            if line.startswith("Total Observed scale h2"):#finds line with h2 data
                 h2 = find_number(tmpline)#returns floats in line
-            if "Intercept:" in line:
-                #int = re.findall("\d+\.\d+", tmpline)
+            if line.startswith("Intercept:"):
                 intercept = find_number(tmpline)
-                print(intercept)
-            if "Ratio" in line:
-                ratio = find_number(tmpline)
+            if line.startswith("Ratio"):
+                ratio = find_number(tmpline) 
                 ratio =  ["NA",'NA']  if len(ratio) != 2 else ratio
 
-
     h2_dict[pheno] = list(map(str,h2 + intercept + ratio))
-
     return h2_dict
 
 if __name__ == '__main__':
