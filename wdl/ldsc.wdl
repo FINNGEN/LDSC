@@ -77,7 +77,7 @@ task multi_rg {
     cat ~{couples} > couples.txt
 
     python3 /scripts/ldsc_mult.py \
-    --ldsc-path "ldsc.py" \
+    --ldsc-path "python3 ldsc-2-to-3/ldsc.py" \
     --list sumstats.txt   \
     --couples couples.txt \
     -o /cromwell_root/results/ \
@@ -217,19 +217,17 @@ task munge_ldsc{
     paste -d '\t' ~{write_lines(phenos)} ~{write_lines(fnames)} ~{write_lines(ns)} | nl --number-format=rn --number-width=2  > meta.txt
     wc -l meta.txt
 
-
     # get ld_path from first file in ld file list
     ld_path="$(dirname ~{ld_files[0]})/"
     echo $ld_path
-    
     # read through file and munge it + calculate heritability
-    while read line ; do arr=($line) && echo -ne "\r${arr[0]}/~{length(phenos)} ${arr[1]}                  "
-    munge_sumstats.py  --sumstats ${arr[2]}  \
-    --N ${arr[3]} --out ${arr[1]}.ldsc  --merge-alleles ~{snplist} 1> /dev/null && \
-    python3 /scripts/het.py  --ldsc-path "ldsc.py" \
-    --sumstats ${arr[1]}.ldsc.sumstats.gz --ld-path $ld_path ~{if defined(args) then "--args " + args else ""} -o . 1> /dev/null ;
+    while read line ; do
+        arr=($line)
+        echo -ne "\r${arr[0]}/~{length(phenos)} ${arr[1]}                  "
+        zcat ${arr[2]} > ${arr[1]}.tmp.txt
+        python3 /ldsc-2-to-3/munge_sumstats.py  --sumstats ${arr[1]}.tmp.txt    --N ${arr[3]} --out ${arr[1]}.ldsc  --merge-alleles ~{snplist} 1> /dev/null
+        python3 /scripts/het.py  --ldsc-path "python3 /ldsc-2-to-3/ldsc.py"   --sumstats ${arr[1]}.ldsc.sumstats.gz --ld-path $ld_path ~{if defined(args) then "--args " + args else ""} -o . 1> /dev/null ;
     done < meta.txt
-
     # merge log files
     cat *ldsc.log >> munge.log &&  cat *ldsc.h2.log >> het.log
 

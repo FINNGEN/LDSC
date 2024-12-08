@@ -1,7 +1,7 @@
 {
     "ldsc_rg.docker": "eu.gcr.io/finngen-refinery-dev/ldsc:ld.1",
     "ldsc_rg.only_het": False,
-    "ldsc_rg.meta_fg": "gs://r12-data/genetic_correlation/inputs/r12_table.txt",
+    "ldsc_rg.meta_fg": "gs://r12-data/genetic_correlation/inputs/r12_table.txt", 
     #optional second list (if absent the first will be used instead )
     #"ldsc_rg.comparison_fg": "gs://r7_data/ldsc/test_data_2.txt",
     # output prefix

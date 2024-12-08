@@ -1,23 +1,18 @@
-from ubuntu:18.04
+FROM eu.gcr.io/finngen-refinery-dev/bioinformatics:0.8
 
-ENV PATH /ldsc:$PATH
-RUN apt-get update && apt-get install git wget -y
 
-# https://github.com/kkellysci/munge_small_pvals.git (version that can handle low pvals)
-RUN git clone https://github.com/bulik/ldsc.git
+RUN apt-get update && apt-get upgrade --yes
 
-RUN wget http://data.broadinstitute.org/alkesgroup/LDSCORE/eur_w_ld_chr.tar.bz2 && tar -xjf eur_w_ld_chr.tar.bz2 && \
-    rm eur_w_ld_chr.tar.bz2 && wget http://data.broadinstitute.org/alkesgroup/LDSCORE/w_hm3.snplist.bz2 && \
-     bzip2 -d w_hm3.snplist.bz2
+# GET LDSC
+RUN apt-get install wget -y
 
-# ptyhon2 for ldsc
-RUN apt-get install libjpeg-dev zlib1g-dev python-minimal python-pip -y
-RUN pip install pandas scipy bitarray
 
-# python3 for custom scripts
+# PYTHON3 VERSION!
+RUN wget https://github.com/belowlab/ldsc/archive/refs/heads/2-to-3.zip  -O master.zip
+RUN unzip master.zip
+RUN pip install -r /ldsc-2-to-3/requirements.txt 
 RUN apt-get install python3  python3-pip -y
-RUN pip3 install Pillow
-RUN pip3 install seaborn
+RUN pip3 install Pillow seaborn bitarray
 RUN apt-get install jq -y
 
 ADD scripts ../scripts/
