@@ -38,7 +38,7 @@ workflow ldsc_rg {
     
     scatter (i in range(length(return_couples.couples))) {
       # where the actual work is done
-      call multi_rg {input: couples=return_couples.couples[i], paths_list = return_couples.paths_list[i],jobs = return_couples.jobs, name = i, docker = docker,ld_list =ld_list}
+      call multi_rg {input: couples=return_couples.couples[i], paths_list = return_couples.paths_list[i],jobs = return_couples.jobs, name = i,ld_list =ld_list,docker=docker}
     }
     
     # gather all the outputs of multi_rg in order to create a final table
@@ -68,30 +68,21 @@ task multi_rg {
   Int disk_size = 20 + ceil(size(sumstats[0],"MB")*length(sumstats)/1000)
 
   
-
   command <<<
-    echo ~{disk_size} ~{final_cpus} ~{jobs}
-    # get ld_path from first file in ld file list
-    ld_path="$(dirname ~{ld_files[0]})/"
-    cat ~{write_lines(sumstats)} > sumstats.txt &&  wc -l sumstats.txt
-    cat ~{couples} > couples.txt
+  echo ~{disk_size} ~{final_cpus} ~{jobs}
+  # get ld_path from first file in ld file list
+  ld_path="$(dirname ~{ld_files[0]})/"
+  cat ~{write_lines(sumstats)} > sumstats.txt &&  wc -l sumstats.txt
+  cat ~{couples} > couples.txt && wc -l couples.txt
 
-    python3 /scripts/ldsc_mult.py \
-    --ldsc-path "python3 ldsc-2-to-3/ldsc.py" \
-    --list sumstats.txt   \
-    --couples couples.txt \
-    -o /cromwell_root/results/ \
-    --ld-path $ld_path \
-    ~{if defined(args) then "--args " + args else ""}
+  python3 /scripts/ldsc_mult.py --ldsc-path "python3 /ldsc-2-to-3/ldsc.py "   --list sumstats.txt --couples couples.txt -o ./results/ --ld-path $ld_path  ~{if defined(args) then "--args " + args else ""}
     
-
-   for f in /cromwell_root/results/*log; do echo $f >> summaries.txt ; done
-   while read f; do cat $f >> ~{name}.log ; done < summaries.txt
-   cat summaries.txt
-
-   python3 /scripts/extract_metadata.py \
-   --summaries summaries.txt \
-   --name ~{name}
+  echo -e "\nDONE"
+  ls ./results/ 
+  for f in ./results/*log; do echo $f >> summaries.txt ; done
+  while read f; do cat $f >> ~{name}.log ; done < summaries.txt
+  cat summaries.txt
+  python3 /scripts/extract_metadata.py  --summaries summaries.txt  --name ~{name}
 
   >>>
 

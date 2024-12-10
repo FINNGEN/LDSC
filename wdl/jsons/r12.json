@@ -1,5 +1,5 @@
 {
-    "ldsc_rg.docker": "eu.gcr.io/finngen-refinery-dev/ldsc:ld.1",
+    "ldsc_rg.docker": "eu.gcr.io/finngen-refinery-dev/ldsc:fg3.4",
     "ldsc_rg.only_het": False,
     "ldsc_rg.meta_fg": "gs://r12-data/genetic_correlation/inputs/r12_table.txt", 
     #optional second list (if absent the first will be used instead )
