@@ -25,10 +25,12 @@ def get_summary(f,suffix):
     """
     Returns part with summary, replaces paths with pheno names and formats the summary
     """
+    
     pheno1,pheno2 = get_phenos(f,suffix)
-    print(pheno1,pheno2)
+    print(pheno1,pheno2,f)
     with open(f) as i:lines = i.readlines()
     converge = False
+    index = 0
     for i,line in enumerate(lines):
         if line.startswith("Genetic Correlation:") and ("nan" not in line):
             converge = True
@@ -37,18 +39,22 @@ def get_summary(f,suffix):
         if line.startswith("Summary of Genetic Correlation Results"):
             index = i
 
-    # reads summary header and content
-    header,summary = lines[index+1:index+3]
-    header = '\t'.join(header.strip().split() + ["CONVERGED"]) + '\n'
+    if index:
+        # reads summary header and content
+        header,summary = lines[index+1:index+3]
+        header = '\t'.join(header.strip().split() + ["CONVERGED"]) + '\n'
 
-    #replaces path with pheno
-    paths = summary.split()[:2]
-    summary = summary.replace(paths[0],pheno1)
-    summary = summary.replace(paths[1],pheno2)
+        #replaces path with pheno
+        paths = summary.split()[:2]
+        summary = summary.replace(paths[0],pheno1)
+        summary = summary.replace(paths[1],pheno2)
 
-    #formats summary output
-    summary = '\t'.join(summary.strip().split() + [str(converge)]) + '\n'
-
+        #formats summary output
+        summary = '\t'.join(summary.strip().split() + [str(converge)]) + '\n'
+    else:
+        
+        summary = '\t'.join([pheno1,pheno2] + ['NA']*10 +  [str(converge)]) + '\n'
+        header = '\t'.join(['p1','p2','rg','se','z','p','h2_obs','h2_obs_se','h2_int','h2_int_se','gcov_int','gcov_int_se','CONVERGED']) + '\n'
     return header,summary
 
 
@@ -59,7 +65,6 @@ def save_summaries(file_list,out_path,suffix):
     with open(file_list) as i: files = [elem.strip() for elem in i]
     to_process = len(files)
     print(f"{to_process} files to parse.")
-
     header,summary = get_summary(files[0],suffix)
     with open(summary_file,'wt') as o:
         o.write(header)

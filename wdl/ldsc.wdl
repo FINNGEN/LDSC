@@ -78,10 +78,11 @@ task multi_rg {
   python3 /scripts/ldsc_mult.py --ldsc-path "python3 /ldsc-2-to-3/ldsc.py "   --list sumstats.txt --couples couples.txt -o ./results/ --ld-path $ld_path  ~{if defined(args) then "--args " + args else ""}
     
   echo -e "\nDONE"
-  ls ./results/ 
-  for f in ./results/*log; do echo $f >> summaries.txt ; done
+  # write to file list of ldsc log files
+  for f in ./results/*log; do echo $f &&  echo $f >> summaries.txt ; done
+  # copy content of each log into single log file
   while read f; do cat $f >> ~{name}.log ; done < summaries.txt
-  cat summaries.txt
+  # extract metadata from each log file
   python3 /scripts/extract_metadata.py  --summaries summaries.txt  --name ~{name}
 
   >>>
