@@ -1,6 +1,6 @@
 {
-    "munge_fg.test": False,
-    "munge_fg.docker": "eu.gcr.io/finngen-refinery-dev/ldsc:10",
-    "munge_fg.meta_fg": "gs://r12-data/genetic_correlation/inputs/r12_meta_table_premunge.txt"
+    "munge_fg.test": false,
+    "munge_fg.docker": "europe-west1-docker.pkg.dev/finngen-refinery-dev/fg-refinery-registry/ldsc:r13",
+    "munge_fg.meta_fg": "gs://r13-data/genetic_correlation/inputs/r13_premunge_table.txt",
   }
 

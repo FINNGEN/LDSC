@@ -24,7 +24,8 @@ workflow ldsc_rg {
   call filter_meta {input: meta_fg = meta_fg,meta_other = meta_other, docker = docker}
 
   #scatter over chunks and run heritability
-  scatter (chunk in filter_meta.chunk_list){
+  scatter (chunk in filter_meta.chunk_list)
+  {
     call munge_ldsc{input:docker = docker, chunk = chunk,ld_list = ld_list}
   }
 
@@ -65,7 +66,7 @@ task multi_rg {
   
   Int final_cpus = if jobs > cpus then cpus else jobs
   Int mem = 2*cpus
-  Int disk_size = 20 + ceil(size(sumstats[0],"MB")*length(sumstats)/1000)
+  Int disk_size = 30 + ceil(size(sumstats[0],"MB")*length(sumstats)/1000)
 
   
   command <<<
@@ -190,17 +191,15 @@ task munge_ldsc{
     File snplist
     String? args    
     File ld_list
-
-    }
     
+  }
+  
   Array[Array[String]] by_type = transpose(read_tsv(chunk))
   Array[String] phenos = by_type[0]
   Array[File] fnames = by_type[1]
   Array[String] ns = by_type[2]
-
-  Int disk_size = 2 + ceil(size(fnames[0],'GB')) * length(fnames)
-  
   Array[File] ld_files = read_lines(ld_list)
+  Int disk_size = 10 + 2*ceil(size(fnames[0],'GB')) * length(fnames) + ceil(size(ld_files,'GB'))
   
   command <<<
 
@@ -341,15 +340,15 @@ task gather_h2{
     File herit_tsv = "${name}.ldsc.heritability.tsv"
     File fig = "${name}.ldsc.heritability.pdf"
     File log = "${name}.ldsc.heritability.log"
-    }
+  }
 
-    runtime {
-      docker: "${docker}"
-      cpu: 2
-      memory: "4 GB"
-      disks: "local-disk 20 HDD"
-      zones: "europe-west1-b europe-west1-c europe-west1-d"
-      preemptible: 2
-      noAddress: true
+  runtime {
+    docker: "${docker}"
+    cpu: 2
+    memory: "4 GB"
+    disks: "local-disk 20 HDD"
+    zones: "europe-west1-b europe-west1-c europe-west1-d"
+    preemptible: 2
+    noAddress: true
   }
 }
