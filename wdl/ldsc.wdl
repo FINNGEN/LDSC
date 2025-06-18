@@ -99,7 +99,7 @@ task multi_rg {
       memory: "${mem} GB"
       disks: "local-disk ${disk_size} HDD"
       zones: "europe-west1-b europe-west1-c europe-west1-d"
-      preemptible: 2
+      preemptible: 1
       noAddress: true
   }
 }
@@ -199,7 +199,7 @@ task munge_ldsc{
   Array[File] fnames = by_type[1]
   Array[String] ns = by_type[2]
   Array[File] ld_files = read_lines(ld_list)
-  Int disk_size = 10 + 2*ceil(size(fnames[0],'GB')) * length(fnames) + ceil(size(ld_files,'GB'))
+  Int disk_size = 30 + 2*ceil(size(fnames[0],'GB')) * length(fnames) + ceil(size(ld_files,'GB'))
   
   command <<<
 

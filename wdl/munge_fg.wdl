@@ -31,6 +31,7 @@ task munge {
   Int file_size = 2*ceil(size(sumstats,"GB")) + 2
 
   command <<<
+  
   gunzip -c ~{sumstats} | \
       awk 'BEGIN{FS=OFS="\t"} \
     NR==1{for(i=1;i<=NF;i++) a[$i]=i; print "SNP","A1","A2","BETA","P"} \
