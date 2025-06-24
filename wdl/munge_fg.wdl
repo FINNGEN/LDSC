@@ -10,12 +10,15 @@ workflow munge_fg {
     Array[Array[String]] sumstats_fg = read_tsv(meta_fg)
     Array[Array[String]] fg_meta  = if test then [sumstats_fg[0],sumstats_fg[1]]   else sumstats_fg
 
-
-    scatter (a in fg_meta) {
-        call munge {
-            input: docker=docker, pheno=a[0], sumstats=a[1]
-            }
-      }
+  scatter (a in fg_meta) {
+    call munge {
+      input: docker=docker, pheno=a[0], sumstats=a[1]
+    }
+  }
+  
+  output {
+    Array[File] paths = munge.out
+  }
 }
 
 
@@ -34,7 +37,7 @@ task munge {
     NR==1{for(i=1;i<=NF;i++) a[$i]=i; print "SNP","A1","A2","BETA","P"} \
     NR>1 {if($a["rsids"]!="") print $a["rsids"],$a["alt"],$a["ref"],$a["beta"],$a["pval"]}' | \
       awk 'BEGIN{FS=OFS="\t"} {n=split($1,a,","); for(i=1;i<=n;i++) print a[i],$0}' | \
-      cut -f1,3- | gzip > ~{pheno}.premunge.gz
+      cut -f1,3- | gzip  > ~{pheno}.premunge.gz
   
   >>>
   

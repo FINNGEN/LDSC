@@ -1,17 +1,12 @@
-#!/usr/bin/env python3
-import shlex,os
-from subprocess import  call,check_output
-import argparse,datetime
-
-curr_path =os.path.dirname(os.path.realpath(__file__))
-root_path = '/'.join(curr_path.split('/')[:-1])
+#!/usr/bin/python3
+import shlex,os,argparse,datetime,subprocess
+from subprocess import Popen, PIPE,call,check_output
+from pathlib import Path
+path = Path(__file__).parent.absolute()
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description="Build Docker file for ldsc")
-
-    parser.add_argument("--docker", type= str,
-                        help="path of docker file",default = curr_path + '/Dockerfile')
+    parser = argparse.ArgumentParser(description="Build Docker file for variant filtering")
 
     parser.add_argument("--image", type= str,
                         help="name of image",default = 'ldsc')
@@ -21,14 +16,13 @@ if __name__ == "__main__":
     parser.add_argument("--args",type = str,default = '')
     args = parser.parse_args()
 
-    docker_path = "eu.gcr.io/finngen-refinery-dev/"
-
-    cmd = f"docker build -t {docker_path}{args.image}:{args.version} -f {args.docker} {root_path} {args.args}"
+    
+    basic_cmd = 'docker build -t europe-west1-docker.pkg.dev/finngen-refinery-dev/fg-refinery-registry/' + args.image +':' +args.version
+    cmd = basic_cmd + f" -f {os.path.join(path,'Dockerfile')} {path.parent} {args.args} "
     print(cmd)
     call(shlex.split(cmd))
 
     if args.push:
-        current_date = datetime.datetime.today().strftime('%Y-%m-%d')
-        cmd = f"gcloud docker -- push {docker_path}{args.image}:{args.version}"
-        with open('./docker.log','a') as o:o.write(' '.join([current_date,cmd]) + '\n')
+        cmd = ' docker -- push europe-west1-docker.pkg.dev/finngen-refinery-dev/fg-refinery-registry/' + args.image +':' + args.version
+        print(cmd)
         call(shlex.split(cmd))

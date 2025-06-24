@@ -51,6 +51,6 @@ if __name__ == '__main__':
     parser.add_argument("-o",help ="Out path")
     parser.add_argument("--debug",action="store_true")
     args = parser.parse_args()
-    make_sure_path_exists(args.o)
     if args.debug:print(args)
+    make_sure_path_exists(args.o)
     h2(args.ldsc_path,args.ld_path,args.args,args.sumstats,args.o,args.debug)
