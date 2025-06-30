@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DESTINATION_BUCKET="gs://finngen-production-library-green/ldsc/r13/premunge"
+DESTINATION_BUCKET="gs://finngen-production-library-green/ldsc/r13"
 SSPATH="gs://r13-data/regenie/release/summary_stats_annotated/"
 ID='64bcda58-7237-4c04-92f0-a40935109e25'
 JSON_FILE="~/Dropbox/Projects/CromwellInteract/tmp/${ID}.json"
@@ -99,14 +99,10 @@ else
     echo "No paths to copy."
 fi
 
-# Second pass: Generate the final OUTPUT_FILE from the collected data
+# Generate the final OUTPUT_FILE from the collected data using awk for efficiency
 echo "Generating $OUTPUT_FILE..."
-> "$OUTPUT_FILE" # Clear output file before writing
-while IFS=$'\t' read -r original_gcs_path filename_base new_gcs_path n_count_val; do
-    echo -e "${filename_base}\t${new_gcs_path}\t${n_count_val}" >> "$OUTPUT_FILE"
-done < "$TEMP_PATHS_FILE"
+awk -F'\t' '{print $2"\t"$3"\t"$4}' "$TEMP_PATHS_FILE" > "$OUTPUT_FILE"
 
 # Clean up temporary file
 rm "$TEMP_PATHS_FILE"
 echo "Script finished. Output in $OUTPUT_FILE"
-
