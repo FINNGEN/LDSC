@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DESTINATION_BUCKET="gs://finngen-production-library-green/ldsc/r13"
+DESTINATION_BUCKET="gs://finngen-production-library-green/ldsc/r13/premunge"
 SSPATH="gs://r13-data/regenie/release/summary_stats_annotated/"
 ID='64bcda58-7237-4c04-92f0-a40935109e25'
 JSON_FILE="~/Dropbox/Projects/CromwellInteract/tmp/${ID}.json"
