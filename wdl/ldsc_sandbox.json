@@ -1,8 +1,8 @@
 {
-    "ldsc_rg.docker": "eu.gcr.io/finngen-refinery-dev/ldsc:fg3.4",
+    "ldsc_rg.docker": "europe-west1-docker.pkg.dev/finngen-refinery-dev/fg-refinery-registry/ldsc:r13",
     "ldsc_rg.only_het": False,
-    "ldsc_rg.meta_fg": "gs://finngen-production-library-green/ldsc/r12/r12_test_table.txt",
-    #"ldsc_rg.comparison_fg": "gs://finngen-production-library-green/ldsc/r12/r12_test_table.txt", #Finngen R8 FULL metatable
+    "ldsc_rg.meta_fg": "gs://finngen-production-library-green/ldsc/r13/r13_test_table.txt",
+    #"ldsc_rg.comparison_fg": "gs://finngen-production-library-green/ldsc/r13/r13_test_table.txt", #Finngen R8 FULL metatable
     "ldsc_rg.name": "finngen_test",
     "ldsc_rg.population" : "fin", #fin/eur
     "ldsc_rg.ld_root" : "gs://finngen-production-library-green/ldsc/POP_ld.txt",
