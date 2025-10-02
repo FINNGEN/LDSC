@@ -2,7 +2,7 @@
 
 DESTINATION_BUCKET="gs://finngen-production-library-green/ldsc/r13/premunge"
 SSPATH="gs://r13-data/regenie/release/summary_stats_annotated/"
-ID='64bcda58-7237-4c04-92f0-a40935109e25'
+ID='b9606267-efd5-4f4b-bf91-c78d084d08de'
 JSON_FILE="~/Dropbox/Projects/CromwellInteract/tmp/${ID}.json"
 OUTPUT_FILE="r13_table.txt"
 N_COUNT_FILE="n_all.txt"
