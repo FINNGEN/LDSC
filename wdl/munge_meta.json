@@ -1,0 +1,15 @@
+{
+  "munge_fg.sumstats_loc": "gs://r13-data/meta-analysis/mvp_ukbb/R13_MVP_UKBB_summary_stats_filtered.txt",
+  "munge_fg.munge.a2_col": "REF",
+  "munge_fg.munge.a1_col": "ALT",
+  "munge_fg.munge.file_suffix": "_meta_out_filtered.tsv.gz",
+  "munge_fg.munge.rsid_col": "rsid",
+  "munge_fg.munge.study_specific_cols": [
+    ["fg", "fg_beta", "fg_pval"],
+    ["ukbb", "ukbb_beta", "ukbb_pval"],
+    ["mvp_eur", "mvp_eur_beta", "mvp_eur_pval"],
+    ["mvp_afr", "mvp_afr_beta", "mvp_afr_pval"],
+    ["mvp_his", "mvp_his_beta", "mvp_his_pval"]
+  ],
+  "munge_fg.docker": "eu.gcr.io/finngen-refinery-dev/bioinformatics:0.8.2"
+}

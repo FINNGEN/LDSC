@@ -1,0 +1,14 @@
+{
+    "ldsc_meta.docker": "europe-west1-docker.pkg.dev/finngen-refinery-dev/fg-refinery-registry/ldsc:r13",
+    "ldsc_meta.only_het": false,
+    "ldsc_meta.meta_fg": "gs://r13-data/meta-analysis/ukbb/inputs/R13_FG_UKBB_labs_LDSC_input.tsv",
+    "ldsc_meta.name": "R13_UKBB_labs",
+    "ldsc_meta.population" : "EUR",
+    "ldsc_meta.ld_path":{
+        "EUR": "gs://finngen-production-library-green/ldsc/eur_ld.txt",
+        "FIN":"gs://finngen-production-library-green/ldsc/fin_ld.txt"
+    },
+    "ldsc_meta.filter_meta.filter_chunks": 10,
+    "ldsc_meta.munge_ldsc.snplist": "gs://finngen-production-library-green/ldsc/w_hm3.snplist",
+    "ldsc_meta.multi_rg.cpus": 4
+}
