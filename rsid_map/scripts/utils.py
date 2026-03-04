@@ -244,54 +244,74 @@ def progressBar(value, endvalue, bar_length=20):
     sys.stdout.write("\rPercent: [{0}] {1}%".format(arrow + spaces, int(round(percent * 100))))
     sys.stdout.flush()
 
-#def load_pos_mapping(chrompos_map):
-    '''
-    Loads the chrom_pos to ref/alt mapping for finngen
-    '''
-    out_pickle = chrompos_map + '.pickle'
-    if os.path.isfile(out_pickle):
-        print('loading chrompos dict -->', out_pickle)
+    
 
-        with open(out_pickle,'rb') as i: pos_dict = pickle.load(i)
-    else:
-        pos_dict = dd(list)
-        print('generating chrompos dict -->', out_pickle)
-        iterator = basic_iterator(chrompos_map)
-        for entry in iterator:
-            chrom_pos,ref,alt = entry
-            pos_dict[chrom_pos].append([ref,alt])
-        with open(out_pickle,'wb') as o:
-            pickle.dump(pos_dict,o,protocol = pickle.HIGHEST_PROTOCOL)
-    print('done.')
-    return pos_dict
+def load_rsid_mapping(rsid_map, inverse=False):
+    """
+    Loads chrompos <-> rsid mapping.
+    
+    Returned mapping:
+      - If inverse=False: chrompos (e.g. "1_13259" or "1:13259:A:G") --> rsID
+      - If inverse=True : rsID --> chrompos
+      
+    Accepts:
+      - .pickle: loads directly
+      - .tsv: builds mapping and pickles for future runs, then loads
 
-#def load_rsid_mapping(rsid_map,inverse = False):
-    '''
-    Loads the chrompos to rsid mapping
-    '''
-    out_pickle = os.path.join(rsid_map) + '.pickle'
-    if inverse:
-        out_pickle += '.chrompos'
-    if os.path.isfile(out_pickle):
-        print('loading rsid dict -->', out_pickle)
-        with open(out_pickle,'rb') as i: rsid_dict = pickle.load(i)
-    else:
-        print('generating rsid dict --> ',out_pickle)
-        rsid_dict = dd(str)
-        header = return_header(rsid_map)
-        rsid_col = [header.index(elem) for elem in header if 'rs' in elem][0]
-        columns = [0,1] if not rsid_col else [1,0]
-        if inverse: columns = columns[::-1]
-        
-        for entry in basic_iterator(rsid_map,columns = columns):
-            rsid,chrom_pos = entry
-            rsid_dict[rsid] = chrom_pos
-        with open(out_pickle,'wb') as o:
-            pickle.dump(rsid_dict,o,protocol = pickle.HIGHEST_PROTOCOL)
+    Always returns a defaultdict that returns empty string for missing keys.
+    """
+    # If a usable pickle already exists (and is named .pickle), load and return it
+    if rsid_map.endswith('.pickle') and os.path.isfile(rsid_map):
+        print(f'Loading rsid dict --> {rsid_map}')
+        with open(rsid_map, 'rb') as f:
+            rsid_dict = pickle.load(f)
         print('done.')
+        # auto-invert if needed
+        if inverse:
+            rsid_dict = {v: k for k, v in rsid_dict.items()}
+        # Guarantee it's always a defaultdict!
+        rsid_dict = dd(str, rsid_dict)
+        return rsid_dict
+
+    out_pickle = rsid_map + '.pickle'
+    # Try loading the .pickle generated from the TSV (for faster repeated loads)
+    if os.path.isfile(out_pickle):
+        print(f'Loading rsid dict --> {out_pickle}')
+        with open(out_pickle, 'rb') as f:
+            rsid_dict = pickle.load(f)
+    else:
+        print(f'Generating rsid dict --> {out_pickle}')
+        rsid_dict = dict()
+        # Identify columns for chrompos and rsID
+        with open(rsid_map, 'r') as infile:
+            header = infile.readline().strip().split('\t')
+            rsid_idx = -1
+            for i, col in enumerate(header):
+                if col.upper() in ['RSID', 'RS', 'SNP', 'dbSNP', 'SNPS', 'SNPID'] or 'rs' in col.lower():
+                    rsid_idx = i
+                    break
+            if rsid_idx == -1:
+                raise RuntimeError("Could not auto-detect rsID column in mapping file header.")
+            chrompos_idx = 1 - rsid_idx if len(header) > 1 else None
+            for line in infile:
+                parts = line.strip().split('\t')
+                if len(parts) < 2:
+                    continue
+                key = parts[chrompos_idx]
+                value = parts[rsid_idx]
+                # By default: key=chrompos, value=rsid, else inverted
+                if not inverse:
+                    rsid_dict[key] = value
+                else:
+                    rsid_dict[value] = key
+        with open(out_pickle, 'wb') as o:
+            pickle.dump(rsid_dict, o, protocol=pickle.HIGHEST_PROTOCOL)
+        print('done.')
+
+    # Enforce returned object is ALWAYS a defaultdict
+    rsid_dict = dd(str, rsid_dict)
+    print(f"Loaded {len(rsid_dict)} mappings.")
     return rsid_dict
-
-
 
 
 def natural_sort(l):

@@ -21,7 +21,6 @@ def main(args):
     else:
         print(f"{vcf_name} already downloaded")
 
-
     # now we proceed to extract info about the variants.
     # CHROM_POS --> RSID
     rsid_map = os.path.join(out_path,'rsid_map.tsv')

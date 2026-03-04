@@ -14,6 +14,4 @@ RUN apt-get install jq -y
 
 ADD scripts ../scripts/
 ADD rsid_map /rsid_map
-RUN chmod +x /scripts/rsid_munge.sh
-RUN chmod -R a+rX /rsid_map
 

@@ -75,6 +75,9 @@ def parse_file(args):
     iterator = basic_iterator(args.file,skiprows=skip)
     if args.to_rsid:
         rsid_dict = load_rsid_mapping(args.map,inverse = True)#chrompos --> rsid
+        import random
+        random_key = random.choice(list(rsid_dict.keys()))
+        print(f"Random mapping: {random_key} -> {rsid_dict[random_key]}")
         out_file = out_file.replace('CONVERT','rsid')
         print(f"saving to {out_file}")
         with write_func(out_file,'wt') as o:
@@ -123,7 +126,7 @@ if __name__ == '__main__':
     parser.add_argument("--map",type = file_exists, help = "Mapping file from rsid to chrompos", required = True)             
     parser.add_argument('--gz',action = 'store_true',help = ' Compress output file to gz',default = False)
     parser.add_argument('--no-header',action = 'store_true',help = 'Flag to use when no header is present',default = False)
-    parser.add_argument('--metadata','-m',nargs = '*',required = True,help='columns required for parsing. Should be SNPID columns for to-chrompos and SNPID,A1,A2 to go to rsid')    
+    parser.add_argument('--metadata','-m',nargs = '*',required = True,help='columns required for parsing. Should be SNPID,A1,A2 columns for to-chrompos and SNPID to go to rsid')    
     parser.add_argument('--columns',help = 'column that need to be kept, either numerical integers or column names',action = 'store',type = str,nargs = '*', default = 'all')
     
     conv_type = parser.add_mutually_exclusive_group(required = True)
