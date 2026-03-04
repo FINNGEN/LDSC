@@ -1,11 +1,8 @@
 FROM eu.gcr.io/finngen-refinery-dev/bioinformatics:0.8
-
-
 RUN apt-get update && apt-get upgrade --yes
 
 # GET LDSC
 RUN apt-get install wget -y
-
 
 # PYTHON3 VERSION!
 RUN wget https://github.com/belowlab/ldsc/archive/refs/heads/2-to-3.zip  -O master.zip
@@ -16,3 +13,7 @@ RUN pip3 install Pillow seaborn bitarray
 RUN apt-get install jq -y
 
 ADD scripts ../scripts/
+ADD rsid_map /rsid_map
+RUN chmod +x /scripts/rsid_munge.sh
+RUN chmod -R a+rX /rsid_map
+
