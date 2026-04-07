@@ -31,7 +31,7 @@ task munge {
         String docker
     }
 
-    Int file_size = 2 * ceil(size(sumstats, "GB")) + 2
+    Int file_size = 3 * ceil(size(sumstats, "GB")) + 2
     String pheno = basename(sumstats, file_suffix)
 
     command <<<
