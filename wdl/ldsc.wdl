@@ -71,15 +71,15 @@ task premunge_ss {
   cat ~{write_lines(sumstats)} > sumstats.txt
   head sumstats.txt
   while read -r f; do
-      bash /scripts/ldsc_rsid_munge.sh \
+      bash /scripts/ldsc_rsid_munge.sh --convert-script /rsid_map/scripts/convert_rsids.py \
            --input "$f" \
            --outdir "$(pwd)" \
            --rsid-map ~{rsid_map} \
-           --beta-col ~{beta_col} \
-           --p-col ~{p_col} \
-           --a1-col ~{a1_effect_col} \
-           --a2-col ~{a2_ne_col} \
-           ~{if defined(chrom_col) then "--chrom-col " + chrom_col else ""}  ~{if defined(pos_col) then "--pos-col " + pos_col else ""}  ~{if defined(rsid_col) then "--rsid " + rsid_col else ""} --convert-script /rsid_map/scripts/convert_rsids.py
+           --beta-col '~{beta_col}' \
+           --p-col '~{p_col}' \
+           --a1-col '~{a1_effect_col}' \
+           --a2-col '~{a2_ne_col}' \
+           ~{if defined(chrom_col) then "--chrom-col '" + chrom_col + "'" else ""}  ~{if defined(pos_col) then "--pos-col '" + pos_col + "'" else ""}  ~{if defined(rsid_col) then "--rsid '" + rsid_col +"'" else ""} 
   done < sumstats.txt
   ls -l *.premunge.gz
   >>>
