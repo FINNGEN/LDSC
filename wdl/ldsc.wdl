@@ -26,9 +26,11 @@ workflow ldsc_rg {
   #scatter over chunks and run heritability
   scatter (chunk in filter_meta.chunk_list)
   {
-    call munge_ldsc{input:docker = docker, chunk = chunk,ld_list = ld_list}
+    call premunge_ss {input:chunk = chunk,docker = docker }
+    call munge_ldsc{input:docker = docker, chunk = chunk,  ld_list = ld_list,premunged=premunge_ss.premunged}
   }
 
+  
   # gather h2 data from munge step
   call gather_h2{input: name = final_name,docker = docker,het_jsons = munge_ldsc.het_json,het_log= munge_ldsc.het_log}
 
@@ -48,6 +50,51 @@ workflow ldsc_rg {
 }
 
 
+
+
+task premunge_ss {
+  input {
+    File chunk              # e.g. chunk file, a tsv with header "pheno, path, N, ..."
+    String docker
+    String beta_col 
+    String p_col
+    String a1_effect_col
+    String a2_ne_col
+    String? chrom_col
+    String? pos_col
+    String? rsid_col
+  }
+  File rsid_map = "gs://finngen-production-library-green/rsids/convert/finngen.rsid.map.tsv.pickle"
+  Array[File] sumstats = transpose(read_tsv(chunk))[1]
+  Int mem = if defined(rsid_col) then 4 else 8
+  Int disk_size = 10 + 2*ceil(size(sumstats,'GB')) * length(sumstats) + ceil(size(rsid_map,'GB'))
+  command <<<
+  set -euo pipefail
+  cat ~{write_lines(sumstats)} > sumstats.txt
+  head sumstats.txt
+  while read -r f; do
+      bash /scripts/ldsc_rsid_munge.sh --convert-script /rsid_map/scripts/convert_rsids.py \
+           --input "$f" \
+           --outdir "$(pwd)" \
+           --rsid-map ~{rsid_map} \
+           --beta-col '~{beta_col}' \
+           --p-col '~{p_col}' \
+           --a1-col '~{a1_effect_col}' \
+           --a2-col '~{a2_ne_col}' \
+           ~{if defined(chrom_col) then "--chrom-col '" + chrom_col + "'" else ""}  ~{if defined(pos_col) then "--pos-col '" + pos_col + "'" else ""}  ~{if defined(rsid_col) then "--rsid '" + rsid_col +"'" else ""} 
+  done < sumstats.txt
+  ls -l *.premunge.gz
+  >>>
+  output {
+    Array[File] premunged = glob("*.premunge.gz")
+  }
+  runtime {
+    docker: docker
+    cpu: 1
+    memory: "~{mem} GB"
+    disks: "local-disk ~{disk_size} HDD"
+  }
+}
 
 task multi_rg {
 
@@ -191,39 +238,40 @@ task munge_ldsc{
     File snplist
     String? args    
     File ld_list
-    
+    Array[File] premunged
   }
   
   Array[Array[String]] by_type = transpose(read_tsv(chunk))
   Array[String] phenos = by_type[0]
-  Array[File] fnames = by_type[1]
+  Array[File] fnames = premunged
   Array[String] ns = by_type[2]
   Array[File] ld_files = read_lines(ld_list)
   Int disk_size = 30 + 2*ceil(size(fnames[0],'GB')) * length(fnames) + ceil(size(ld_files,'GB'))
   
   command <<<
 
-    df -h .
-    # rebuild the original tsv with metadata but now localized filepaths and add line number
-    paste -d '\t' ~{write_lines(phenos)} ~{write_lines(fnames)} ~{write_lines(ns)} | nl --number-format=rn --number-width=2  > meta.txt
-    wc -l meta.txt
+  df -h .
+  cat ~{write_lines(phenos)} > phenos.txt &&   cat ~{write_lines(fnames)} > fnames.txt &&  cat ~{write_lines(ns)} > ns.txt
+  # update the table with the premunged paths
+  python3 -c "import sys,os; phenos=[l.strip() for l in open('phenos.txt')]; fnames=[l.strip() for l in open('fnames.txt')]; ns=[l.strip() for l in open('ns.txt')]; [(os.path.basename(f).replace('.premunge.gz','')==p or sys.exit(f'mismatch: {p} {f}')) for p,f in zip(phenos,fnames)]; [print(f'{p}\t{f}\t{n}') for p,f,n in zip(phenos,fnames,ns)]" | nl --number-format=rn --number-width=2 > meta.txt
+  head meta.txt
 
-    # get ld_path from first file in ld file list
-    ld_path="$(dirname ~{ld_files[0]})/"
-    echo $ld_path
-    # read through file and munge it + calculate heritability
-    while read line ; do
-        arr=($line)
-        echo -ne "\r${arr[0]}/~{length(phenos)} ${arr[1]}                  "
-        zcat ${arr[2]} > ${arr[1]}.tmp.txt
-        python3 /ldsc-2-to-3/munge_sumstats.py  --sumstats ${arr[1]}.tmp.txt    --N ${arr[3]} --out ${arr[1]}.ldsc  --merge-alleles ~{snplist} 1> /dev/null
-        python3 /scripts/het.py  --ldsc-path "python3 /ldsc-2-to-3/ldsc.py"   --sumstats ${arr[1]}.ldsc.sumstats.gz --ld-path $ld_path ~{if defined(args) then "--args " + args else ""} -o . 1> /dev/null ;
-    done < meta.txt
-    # merge log files
-    cat *ldsc.log >> munge.log &&  cat *ldsc.h2.log >> het.log
-
-    # merge jsons into one
-    jq -s 'reduce .[] as $item ({}; . * $item)' ./*json > het.json 
+  # get ld_path from first file in ld file list
+  ld_path="$(dirname ~{ld_files[0]})/"
+  echo $ld_path
+  # read through file and munge it + calculate heritability
+  while read line ; do
+      arr=($line)
+      echo -ne "\r${arr[0]}/~{length(phenos)} ${arr[1]}                  "
+      zcat ${arr[2]} > ${arr[1]}.tmp.txt
+      python3 /ldsc-2-to-3/munge_sumstats.py  --sumstats ${arr[1]}.tmp.txt    --N ${arr[3]} --out ${arr[1]}.ldsc  --merge-alleles ~{snplist} 1> /dev/null
+      python3 /scripts/het.py  --ldsc-path "python3 /ldsc-2-to-3/ldsc.py"   --sumstats ${arr[1]}.ldsc.sumstats.gz --ld-path $ld_path ~{if defined(args) then "--args " + args else ""} -o . 1> /dev/null ;
+  done < meta.txt
+  # merge log files
+  cat *ldsc.log >> munge.log &&  cat *ldsc.h2.log >> het.log
+  
+  # merge jsons into one
+  jq -s 'reduce .[] as $item ({}; . * $item)' ./*json > het.json 
 
   >>>
   output {
@@ -231,7 +279,6 @@ task munge_ldsc{
     File munge_log = "./munge.log"
     File het_json = "./het.json"
     File het_log = " ./het.log"
-
   }
   runtime {
       docker: "${docker}"
@@ -240,7 +287,6 @@ task munge_ldsc{
       disks: "local-disk ${disk_size} HDD"
       zones: "europe-west1-b europe-west1-c europe-west1-d"
       preemptible: 2
-      noAddress: true
   }
 }
 

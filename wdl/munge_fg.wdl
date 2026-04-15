@@ -1,6 +1,5 @@
 version 1.0
 
-
 workflow munge_fg {
   input {
     File meta_fg
