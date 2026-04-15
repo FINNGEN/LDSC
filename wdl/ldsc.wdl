@@ -66,6 +66,8 @@ task premunge_ss {
   }
   File rsid_map = "gs://finngen-production-library-green/rsids/convert/finngen.rsid.map.tsv.pickle"
   Array[File] sumstats = transpose(read_tsv(chunk))[1]
+  Int mem = if defined(rsid_col) then 4 else 8
+  Int disk_size = 10 + 2*ceil(size(sumstats,'GB')) * length(sumstats) + ceil(size(rsid_map,'GB'))
   command <<<
   set -euo pipefail
   cat ~{write_lines(sumstats)} > sumstats.txt
@@ -89,8 +91,8 @@ task premunge_ss {
   runtime {
     docker: docker
     cpu: 1
-    memory: "4 GB"
-    disks: "local-disk 20 HDD"
+    memory: "~{mem} GB"
+    disks: "local-disk ~{disk_size} HDD"
   }
 }
 
