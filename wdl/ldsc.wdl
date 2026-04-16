@@ -18,8 +18,7 @@ workflow ldsc_rg {
 
   File ld_list = ld_path[population]
   String final_name = name + "_" + population
-  
-  
+   
   # merge sumstats keeping unique values across them and creating munge chunks
   call filter_meta {input: meta_fg = meta_fg,meta_other = meta_other, docker = docker}
 
@@ -29,7 +28,6 @@ workflow ldsc_rg {
     call premunge_ss {input:chunk = chunk,docker = docker }
     call munge_ldsc{input:docker = docker, chunk = chunk,  ld_list = ld_list,premunged=premunge_ss.premunged}
   }
-
   
   # gather h2 data from munge step
   call gather_h2{input: name = final_name,docker = docker,het_jsons = munge_ldsc.het_json,het_log= munge_ldsc.het_log}
@@ -38,18 +36,14 @@ workflow ldsc_rg {
   {
     # returns all valid couples of phenocodes that need to be run in terms of absolute paths from the output of the previous task
     call return_couples { input : file1 = meta_fg,file2 = meta_other, munged_chunks = munge_ldsc.munged, docker = docker}
-    
     scatter (i in range(length(return_couples.couples))) {
       # where the actual work is done
       call multi_rg {input: couples=return_couples.couples[i], paths_list = return_couples.paths_list[i],jobs = return_couples.jobs, name = i,ld_list =ld_list,docker=docker}
     }
-    
     # gather all the outputs of multi_rg in order to create a final table
     call gather_summaries {  input:   docker = docker,   name = final_name,   summaries = multi_rg.summary, logs = multi_rg.log   }
   }
 }
-
-
 
 
 task premunge_ss {
@@ -67,7 +61,7 @@ task premunge_ss {
   File rsid_map = "gs://finngen-production-library-green/rsids/convert/finngen.rsid.map.tsv.pickle"
   Array[File] sumstats = transpose(read_tsv(chunk))[1]
   Int mem = if defined(rsid_col) then 4 else 8
-  Int disk_size = 10 + 2*ceil(size(sumstats,'GB')) * length(sumstats) + ceil(size(rsid_map,'GB'))
+  Int disk_size = 10 + 2*ceil(size(sumstats[0],'GB')) * length(sumstats) + ceil(size(rsid_map,'GB'))
   command <<<
   set -euo pipefail
   cat ~{write_lines(sumstats)} > sumstats.txt
@@ -167,50 +161,28 @@ task return_couples {
 
   command <<<
 
-  # write to file all absolute paths of sumstats
+  # Initalize variables/inputs
   cat ~{write_lines(munged_sumstats)} > path_list.txt
+  cat ~{write_tsv(list1)} > phenos1.txt
+  cat ~{write_tsv(list2)} > phenos2.txt
+  num_chunks=~{chunks}
+  
+  # 1. Generate unique, sorted pairs
+  awk 'NR==FNR{a[$1];next} {for(i in a) print ($1 < i ? $1"\t"i : i"\t"$1)}' phenos1.txt phenos2.txt | sort -u > all_pairs.tmp
 
-  python3 <<CODE
+  # 2. Calculate chunk size
+  total_pairs=$(wc -l < all_pairs.tmp)
+  n=$(( (total_pairs + num_chunks - 1) / num_chunks ))
 
-  import itertools,os
+  # 3. Split into chunk files
+  split -l "$n" -d -a 2 all_pairs.tmp chunk_
 
-  # open input pheno lists
-  with open('~{write_tsv(list1)}') as i: first_list = [elem.strip().split()[0] for elem in i.readlines()]
-  with open('~{write_tsv(list2)}') as i: second_list = [elem.strip().split()[0] for elem in i.readlines()]
+  # 4. Builds list of required sumstats for each chunk
+  python3 -c "import os, glob; d={os.path.basename(f).split('.ldsc.sumstats.gz')[0]: f.strip() for f in open('path_list.txt')}; [open(f.replace('chunk_', 'paths_'), 'w').write('\n'.join(set(d[p] for line in open(f) for p in line.strip().split('\t') if p in d))) for f in glob.glob('chunk_*')]"
 
-  #create all possible combinations
-  couples = itertools.product(list(set(first_list)),list(set(second_list)))
-
-  #sort them based on first element and return unique elements
-  sorted_couples = sorted([list(elem) for elem in set([tuple(sorted(list(couple))) for couple in couples])])
-  print(len(first_list))
-  print(len(second_list))
-  print(len(sorted_couples))
-  # return subchunks
-  n = 1 + len(sorted_couples)//~{chunks}
-  sublists = [sorted_couples[i:i + n] for i in range(0, len(sorted_couples), n)]
-
-  # create pheno to file mapping
-  pheno_file_dict ={}
-  with open("./path_list.txt",'rt') as i:
-    for line in i:
-      f = line.strip()
-      pheno_file_dict[os.path.basename(f).split('.ldsc.sumstats.gz')[0]] = f
-
-  # convert pheno couples to file couples and create chunks with absolute paths to munged sumstats
-  for i,sub in enumerate(sublists):
-      with open(f"./chunk_{i}",'wt') as o,open(f"./paths_{i}",'wt') as p:
-        paths = []
-        for c in sub:
-          o.write('\t'.join(c) + '\n')
-          for pheno in c:paths.append(pheno_file_dict[pheno])
-        p.write('\n'.join(set(paths)))
-
-
-  with open('jobs.txt','wt') as o:
-      o.write(str(n))
-
-  CODE
+  # 5. Cleanup and Metadata
+  echo "$n" > jobs.txt
+  rm all_pairs.tmp
   >>>
 
   output {
@@ -301,10 +273,8 @@ task filter_meta {
   command <<<
   cat ~{meta_fg} > tmp.txt
   cat ~{meta_other} >> tmp.txt
-
   sort tmp.txt | uniq >> meta.txt
   split -en r/~{filter_chunks} -d --additional-suffix=.txt meta.txt chunk
-
   >>>
 
   output {Array[File] chunk_list =  glob("./chunk*")}
@@ -361,24 +331,18 @@ task gather_h2{
   input {
     Array[File] het_jsons
     Array[File] het_log
-    
     String name
     String docker
   }
   
 
   command <<<
-
   cat ~{write_lines(het_jsons)} >> h2.txt
-
   python3 /scripts/extract_metadata.py \
   --het h2.txt \
   --name ~{name}
-
   while read f; do cat $f >> ~{name}.ldsc.heritability.log; done <  ~{write_lines(het_log)}
-
   python3 /scripts/plot_summary.py  --het ~{name}.ldsc.heritability.tsv  --columns INT RATIO
-
   >>>
 
   output {
