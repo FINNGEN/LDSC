@@ -178,7 +178,7 @@ task return_couples {
   split -l "$n" -d -a 2 all_pairs.tmp chunk_
 
   # 4. Builds list of required sumstats for each chunk
-  python3 -c "import os, glob; d={os.path.basename(f).split('.ldsc.sumstats.gz')[0]: f.strip() for f in open('path_list.txt')}; [open(f.replace('chunk_', 'paths_'), 'w').write('\n'.join(set(d[p] for line in open(f) for p in line.strip().split('\t') if p in d))) for f in glob.glob('chunk_*')]"
+  python3 -c "import os, sys; d={os.path.basename(f).replace('.premunge.gz',''): (f, n) for f, n in zip(open('fnames.txt').read().splitlines(), open('ns.txt').read().splitlines())}; [print(f'{p}\t{d[p][0]}\t{d[p][1]}') if p in d else sys.exit(f'Missing: {p}') for p in open('phenos.txt').read().splitlines()]" | nl --number-format=rn --number-width=2 > meta.txt
 
   # 5. Cleanup and Metadata
   echo "$n" > jobs.txt
