@@ -4,12 +4,47 @@ Wrapper pipeline based on https://github.com/bulik/ldsc.
 
 Most of the work is done by the wdl itself, but some preprocessing steps are needed, mainly due to the fact that the nature of the input sumstats can be different.
 
-## Preprocressing
-### Step1 - Munge data
+## WDL
+The wdl takes a list of sumstats and generates heritabilites and (optional) genetic correlation between all N(N-1)/2 pairs or iff two separate lists are passed then only between cross N*M pairs.
 
-In this step we need to make sure that input sumstats are coherent with the requirements by ldsc for its own munging step.
+### Inputs
 
-The required input format is as follows:
+
+| Parameter | Description |
+|-----------|-------------|
+| `ldsc_rg.docker` | Docker image used for pipeline tasks. |
+| `ldsc_rg.only_het` | If `true`, computes only heritabilities (not genetic correlations). |
+| `ldsc_rg.meta_fg` | Metadata table for primary summary statistics (TSV). |
+| `ldsc_rg.comparison_fg` | (Optional) Metadata table for secondary sumstats (for cross-trait analysis). |
+| `ldsc_rg.name` | Output prefix for result files. |
+| `ldsc_rg.population` | Population label for LD score reference (e.g., "EUR", "FIN"). |
+| `ldsc_rg.ld_path` | A map linking population codes to LD score files. |
+| `ldsc_rg.filter_meta.filter_chunks` | Number of chunks to split input tables for parallel processing (increase for large datasets). |
+| `ldsc_rg.premunge_ss.p_col` | Column name for p-value in your sumstats. |
+| `ldsc_rg.premunge_ss.a1_effect_col` | Column name for effect allele. |
+| `ldsc_rg.premunge_ss.a2_ne_col` | Column name for non-effect/reference allele. |
+| `ldsc_rg.premunge_ss.beta_col` | Column name for effect size (beta). |
+| `ldsc_rg.premunge_ss.rsid_col` | Column name for rsIDs. |
+| `ldsc_rg.premunge_ss.chrom_col` | (Optional) Column name for chromosome (if not using rsIDs). |
+| `ldsc_rg.premunge_ss.pos_col` | (Optional) Column name for position (if not using rsIDs). |
+| `ldsc_rg.munge_ldsc.snplist` | Path to snplist file for LD score regression. |
+| `ldsc_rg.return_couples.chunks` | Number of parallel batches for genetic correlation computations. |
+| `ldsc_rg.multi_rg.cpus` | Number of CPUs to use for multi_rg step. |
+| `ldsc_rg.multi_rg.args` | (Optional) Extra arguments passed to ldsc.py. |
+
+
+The metadata tables should be  structured as `PHENO\tPATH\tN` where `N` is the total number of valid cases+controls of each pheno.
+```
+C3_BREAST_EXALLC	gs://fg-cromwell_fresh/munge_fg/d17c3b71-2510-4d89-8bfb-3f788b50bd59/call-munge/shard-0/C3_BREAST_EXALLC.premunge.gz	110611
+C3_BRONCHUS_LUNG_EXALLC	gs://fg-cromwell_fresh/munge_fg/d17c3b71-2510-4d89-8bfb-3f788b50bd59/call-munge/shard-1/C3_BRONCHUS_LUNG_EXALLC.premunge.gz	180418
+C3_PROSTATE_EXALLC	gs://fg-cromwell_fresh/munge_fg/d17c3b71-2510-4d89-8bfb-3f788b50bd59/call-munge/shard-2/C3_PROSTATE_EXALLC.premunge.gz	83146
+G6_PARKINSON	gs://fg-cromwell_fresh/munge_fg/d17c3b71-2510-4d89-8bfb-3f788b50bd59/call-munge/shard-3/G6_PARKINSON.premunge.gz	224566
+H7_AMD	gs://fg-cromwell_fresh/munge_fg/d17c3b71-2510-4d89-8bfb-3f788b50bd59/call-munge/shard-4/H7_AMD.premunge.gz	214660
+```
+
+### Munging
+
+The wdl now contains internally a `premunge_ss` step where input sumstats are processed to match the LDSC notation, which is 
 
 ```
 SNP	A1	A2	BETA	P
@@ -24,63 +59,20 @@ rs577189614	A	G	0.0845	0.5341
 rs77357188	T	C	-0.0414	0.3383
 ```
 
-For FG sumstats (from pheweb) the command
-```
-gunzip -c $SUMSTATS | \
-awk 'BEGIN{FS=OFS="\t"} NR==1{for(i=1;i<=NF;i++) a[$i]=i; print "SNP","A1","A2","BETA","P"}   NR>1 {if($a["rsids"]!="") print $a["rsids"],$a["alt"],$a["ref"],$a["beta"],$a["pval"]}' | \
-awk 'BEGIN{FS=OFS="\t"} {n=split($1,a,","); for(i=1;i<=n;i++) print a[i],$0}' | \
-cut -f1,3- | gzip > $PHENO.premunge.gz
-```
 
-will do the trick.
+Therefore now the the inputs also require to pass the relevant column names for the munging. In case the data is not in rsid format, the script will automatically map chrom/pos --> rsid if needed. `chrom_col` and `pos_col` are required *only* if the `rsid_col` is missing
 
-To simplify, one can simply run the `munge_fg.wdl` provided updating the ```munge_fg.meta_fg``` input file, which is a tsv that contains `PHENO\tPATH`:
-```
-C3_BREAST_EXALLC	gs://finngen-production-library-green/finngen_R5/finngen_R5_analysis_data/summary_stats/release/finngen_R5_C3_BREAST_EXALLC.gz
-C3_BRONCHUS_LUNG_EXALLC	gs://finngen-production-library-green/finngen_R5/finngen_R5_analysis_data/summary_stats/release/finngen_R5_C3_BRONCHUS_LUNG_EXALLC.gz
-C3_PROSTATE_EXALLC	gs://finngen-production-library-green/finngen_R5/finngen_R5_analysis_data/summary_stats/release/finngen_R5_C3_PROSTATE_EXALLC.gz
-G6_PARKINSON	gs://finngen-production-library-green/finngen_R5/finngen_R5_analysis_data/summary_stats/release/finngen_R5_G6_PARKINSON.gz
-```
-
-### Step2 - Metadata table
-
-The pipeline requres a metadata table for each input list of sumstats to be processed. The input file needs to be structured as `PHENO\tPATH\tN` where `N` is the total number of valid cases+controls of each pheno.
-```
-C3_BREAST_EXALLC	gs://fg-cromwell_fresh/munge_fg/d17c3b71-2510-4d89-8bfb-3f788b50bd59/call-munge/shard-0/C3_BREAST_EXALLC.premunge.gz	110611
-C3_BRONCHUS_LUNG_EXALLC	gs://fg-cromwell_fresh/munge_fg/d17c3b71-2510-4d89-8bfb-3f788b50bd59/call-munge/shard-1/C3_BRONCHUS_LUNG_EXALLC.premunge.gz	180418
-C3_PROSTATE_EXALLC	gs://fg-cromwell_fresh/munge_fg/d17c3b71-2510-4d89-8bfb-3f788b50bd59/call-munge/shard-2/C3_PROSTATE_EXALLC.premunge.gz	83146
-G6_PARKINSON	gs://fg-cromwell_fresh/munge_fg/d17c3b71-2510-4d89-8bfb-3f788b50bd59/call-munge/shard-3/G6_PARKINSON.premunge.gz	224566
-H7_AMD	gs://fg-cromwell_fresh/munge_fg/d17c3b71-2510-4d89-8bfb-3f788b50bd59/call-munge/shard-4/H7_AMD.premunge.gz	214660
-```
-
-If needed, the script `build_tables.py` helps in this matter.
-By running `python3 build_tables.py --endpoints GZIPPED_ENDPOINT_FILE --sumstats LIST_OF_PHENOS -o OUTPATH` a file called `count.txt` is generated where the structure is `PHENO\tN\CASES\CONTROLS\NAs`
-```
-C3_BREAST_EXALLC	110611	8597	102014	113955
-C3_BRONCHUS_LUNG_EXALLC	180418	1735	178683	44148
-C3_PROSTATE_EXALLC	83146	6464	76682	141420
-G6_PARKINSON	224566	2207	222359	0
-H7_AMD	214660	3867	210793	9906
-H7_CATARACTSENILE	222085	27421	194664	2481
-H7_GLAUCPRIMOPEN	220275	4558	215717	4291
-I9_AF	142885	22559	120326	81681
-I9_MI_STRICT	204766	11909	192857	19800
-J10_ASTHMA	160321	21128	139193	64245
-```
-
-One can then easily use the `join` command to build the table.E.g.
-`while read f; do PHENO=$(basename $f .premunge.gz) && echo -e "$PHENO\t$f" | join - -t $'\t' <(cut -f 1,2 counts.txt); done < flagship_paths_munged.txt > input_meta.txt`
-
-
-## WDL time!
+### Long description
 
 Now all the data is ready to run the big run. A brief summary of the logic of the wdl.
 
-The boolean flag "het_only" if set to True only produces heritabilities and does not compute genetic correlations. It's set to false by default, thus automatically calculating correlations. Please make sure it's your intention to do so.
+The boolean flag `het_only` if set to `True` only produces heritabilities and does not compute genetic correlations. It's set to false by default, thus automatically calculating correlations. Please make sure it's your intention to do so.
 
-As input one can have two lists of sumstats or just one. If two are provided then all the cross scores are computed between the two lists. If only one is passed instead the first list is duplicated as a second, thus running an inner product on itself. The total number of comparison that needs to run is `N*L/2` jobs to be run where `N` and `L` are the lengths of the two lists. In case of inner product, the number is `N(N-1)/2` instead. This means that the growht is quadratic and thus I recommed first testing the pipeline with a smaller set of sumstats.
+As input one can have two lists of sumstats or just one. If two are provided then all the cross scores are computed between the two lists. If only one is passed instead the first list is duplicated as a second, thus running an inner product on itself. The total number of comparison that needs to run is `N*L` jobs to be run where `N` and `L` are the lengths of the two lists. In case of inner product, the number is `N(N-1)/2` instead. This means that the growht is quadratic and thus I recommed first testing the pipeline with a smaller set of sumstats.
 
 `filter_meta` splits the input lists into chunks for munging. The number of chunks in this step is given by `  "ldsc_rg.filter_meta.filter_chunks": Int`. This step is quite fast anyways and, in principle, should only run once since its output is cached.
+
+Each input chunk list is passed to `premunge_ss` that prepares the input sumstats for the ldsc pipeline as described above.
 
 Each input chunk list is passed to `munge_ldsc`. In this step, the input sumstats are munged by ldsc directly and, while we're at it, the heritability is calculated. The outputs of the heritability calculation are passed to `gather_h2` which builds an output table and json with all the summaries, as well as merging all the logs.
 
