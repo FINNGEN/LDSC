@@ -114,9 +114,9 @@ task munge_ldsc{
     String? args    
     File ld_list
     Array[File] premunged
+    File snplist
   }
 
-  File snplist = "gs://finngen-production-library-green/ldsc/w_hm3.snplist"
   Array[String] phenos = transpose(read_tsv(chunk))[0]
   Array[String] ns = transpose(read_tsv(chunk))[2]
   Array[File] ld_files = read_lines(ld_list)
@@ -126,7 +126,7 @@ task munge_ldsc{
 
   # build input PHENO\tPATH from premunged files
   cat ~{write_lines(premunged)} > premunged.txt
-  while read f; do name="${f%.premunge.gz}"; pheno="${name##*.}"; original="${name%.*}"; printf '%s\t%s\n' "$pheno" "$(pwd)/$f" >> restored_mapping.tsv ; done < premunged.txt
+  while read f; do name="${f%.premunge.gz}"; pheno="${name##*.}"; printf '%s\t%s\n' "$pheno" "$f" >> restored_mapping.tsv ; done < premunged.txt
   sort -k1 restored_mapping.tsv > premunge_mapping.txt
   # write mapping based on input chunk Ns
   paste <(cat ~{write_lines(phenos)}) <(cat ~{write_lines(ns)}) | sort -k1 > ns_mapping.txt
@@ -156,7 +156,7 @@ task munge_ldsc{
     Array[File] munged = glob("./*sumstats.gz")
     File munge_log = "./munge.log"
     File het_json = "./het.json"
-    File het_log = " ./het.log"
+    File het_log = "./het.log"
   }
   runtime {
       docker: "${docker}"
@@ -167,8 +167,6 @@ task munge_ldsc{
       preemptible: 2
   }
 }
-
-
 
 task return_couples {
 
