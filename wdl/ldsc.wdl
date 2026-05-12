@@ -45,42 +45,57 @@ workflow ldsc_rg {
   }
 }
 
-
 task premunge_ss {
   input {
-    File chunk              # e.g. chunk file, a tsv with header "pheno, path, N, ..."
+    File chunk
     String docker
-    String beta_col 
+    String beta_col
     String p_col
     String a1_effect_col
     String a2_ne_col
-    String? chrom_col
-    String? pos_col
-    String? rsid_col
+    String chrom_col = ""
+    String pos_col = ""
+    String rsid_col = ""
   }
   File rsid_map = "gs://finngen-production-library-green/rsids/convert/finngen.rsid.map.tsv.pickle"
+  Array[String] phenos = transpose(read_tsv(chunk))[0]
   Array[File] sumstats = transpose(read_tsv(chunk))[1]
-  Int mem = if defined(rsid_col) then 4 else 8
+  Int mem = if rsid_col == "" then 8 else 4
   Int disk_size = 10 + 2*ceil(size(sumstats[0],'GB')) * length(sumstats) + ceil(size(rsid_map,'GB'))
   command <<<
   set -euo pipefail
+  cat ~{write_lines(phenos)} > phenos.txt
   cat ~{write_lines(sumstats)} > sumstats.txt
   head sumstats.txt
-  while read -r f; do
+  mapfile -t pheno_arr < phenos.txt
+  mapfile -t ss_arr < sumstats.txt
+  for i in "${!ss_arr[@]}"; do
+      rm -f *pre_convert*
+      prev=$(ls *.premunge.gz 2>/dev/null | sort || true)
       bash /scripts/ldsc_rsid_munge.sh --convert-script /rsid_map/scripts/convert_rsids.py \
-           --input "$f" \
+           --input "${ss_arr[$i]}" \
            --outdir "$(pwd)" \
            --rsid-map ~{rsid_map} \
            --beta-col '~{beta_col}' \
            --p-col '~{p_col}' \
            --a1-col '~{a1_effect_col}' \
            --a2-col '~{a2_ne_col}' \
-           ~{if defined(chrom_col) then "--chrom-col '" + chrom_col + "'" else ""}  ~{if defined(pos_col) then "--pos-col '" + pos_col + "'" else ""}  ~{if defined(rsid_col) then "--rsid '" + rsid_col +"'" else ""} 
-  done < sumstats.txt
+           ~{if chrom_col != "" then "--chrom-col '" + chrom_col + "'" else ""} \
+           ~{if pos_col != "" then "--pos-col '" + pos_col + "'" else ""} \
+           ~{if rsid_col != "" then "--rsid '" + rsid_col + "'" else ""}
+      # identify new file and rename it to match PHENO.premunge.gz
+      new_file=$(comm -13 <(echo "$prev" | grep -v '^$') <(ls *.premunge.gz | sort) | head -1)
+      raw_base=$(basename "${ss_arr[$i]}") && new_file="${raw_base%.*}.premunge.gz"
+      final_name="${new_file/.premunge.gz/.${pheno_arr[$i]}.premunge.gz}"
+      mv "$new_file" "$final_name" && echo "MOVED: $new_file TO: $final_name" && printf '%s\t%s\n' "${pheno_arr[$i]}" "$final_name"
+      printf '%s\t%s\n' "${pheno_arr[$i]}" "$new_file" >> mapping.tsv
+  done
+
   ls -l *.premunge.gz
+  cat mapping.tsv
   >>>
   output {
-    Array[File] premunged = glob("*.premunge.gz")
+    Array[File] premunged = glob("./*.premunge.gz")
   }
   runtime {
     docker: docker
@@ -90,142 +105,33 @@ task premunge_ss {
   }
 }
 
-task multi_rg {
-
-  input {
-    File couples
-    File paths_list
-    File ld_list
-    String name
-    Int cpus
-    Int jobs
-    String docker
-    String? args
-  }
-  Array[File] sumstats = read_lines(paths_list)
-  Array[File] ld_files = read_lines(ld_list)
-  
-  Int final_cpus = if jobs > cpus then cpus else jobs
-  Int mem = 2*cpus
-  Int disk_size = 30 + ceil(size(sumstats[0],"MB")*length(sumstats)/1000)
-
-  
-  command <<<
-  echo ~{disk_size} ~{final_cpus} ~{jobs}
-  # get ld_path from first file in ld file list
-  ld_path="$(dirname ~{ld_files[0]})/"
-  cat ~{write_lines(sumstats)} > sumstats.txt &&  wc -l sumstats.txt
-  cat ~{couples} > couples.txt && wc -l couples.txt
-
-  python3 /scripts/ldsc_mult.py --ldsc-path "python3 /ldsc-2-to-3/ldsc.py "   --list sumstats.txt --couples couples.txt -o ./results/ --ld-path $ld_path  ~{if defined(args) then "--args " + args else ""}
-    
-  echo -e "\nDONE"
-  # write to file list of ldsc log files
-  for f in ./results/*log; do echo $f &&  echo $f >> summaries.txt ; done
-  # copy content of each log into single log file
-  while read f; do cat $f >> ~{name}.log ; done < summaries.txt
-  # extract metadata from each log file
-  python3 /scripts/extract_metadata.py  --summaries summaries.txt  --name ~{name}
-
-  >>>
-
-  output {
-      File log = "${name}.log"
-      File summary = "${name}.ldsc.summary.log"
-  }
-
-  runtime {
-      docker: "${docker}"
-      cpu: "${final_cpus}"
-      memory: "${mem} GB"
-      disks: "local-disk ${disk_size} HDD"
-      zones: "europe-west1-b europe-west1-c europe-west1-d"
-      preemptible: 1
-      noAddress: true
-  }
-}
-
-task return_couples {
-
-  input {
-    File file1
-    File file2
-    Int chunks
-    String docker
-    Array[Array[String]] munged_chunks
-  }
-  
-  Array[Array[String]] list1 = read_tsv(file1)
-  Array[Array[String]] list2 = read_tsv(file2)
-  Array[String] munged_sumstats = flatten(munged_chunks)
-
-  command <<<
-
-  # Initalize variables/inputs
-  cat ~{write_lines(munged_sumstats)} > path_list.txt
-  cat ~{write_tsv(list1)} > phenos1.txt
-  cat ~{write_tsv(list2)} > phenos2.txt
-  num_chunks=~{chunks}
-  
-  # 1. Generate unique, sorted pairs
-  awk 'NR==FNR{a[$1];next} {for(i in a) print ($1 < i ? $1"\t"i : i"\t"$1)}' phenos1.txt phenos2.txt | sort -u > all_pairs.tmp
-
-  # 2. Calculate chunk size
-  total_pairs=$(wc -l < all_pairs.tmp)
-  n=$(( (total_pairs + num_chunks - 1) / num_chunks ))
-
-  # 3. Split into chunk files
-  split -l "$n" -d -a 2 all_pairs.tmp chunk_
-
-  # 4. Builds list of required sumstats for each chunk
-  python3 -c "import os, sys; d={os.path.basename(f).replace('.premunge.gz',''): (f, n) for f, n in zip(open('fnames.txt').read().splitlines(), open('ns.txt').read().splitlines())}; [print(f'{p}\t{d[p][0]}\t{d[p][1]}') if p in d else sys.exit(f'Missing: {p}') for p in open('phenos.txt').read().splitlines()]" | nl --number-format=rn --number-width=2 > meta.txt
-
-  # 5. Cleanup and Metadata
-  echo "$n" > jobs.txt
-  rm all_pairs.tmp
-  >>>
-
-  output {
-      Array[File] couples = glob("./chunk*")
-      Array[File] paths_list = glob("./paths*")
-      Int jobs = read_int("jobs.txt")
-  }
-
-  runtime {
-      docker: "${docker}"
-      cpu: 2
-      memory: "4 GB"
-      disks: "local-disk 10 HDD"
-      zones: "europe-west1-b europe-west1-c europe-west1-d"
-      preemptible: 2
-      noAddress: true
-  }
-}
 
 task munge_ldsc{
 
   input {
     File chunk
     String docker
-    File snplist
     String? args    
     File ld_list
     Array[File] premunged
   }
-  
-  Array[Array[String]] by_type = transpose(read_tsv(chunk))
-  Array[String] phenos = by_type[0]
-  Array[File] fnames = premunged
-  Array[String] ns = by_type[2]
+
+  File snplist = "gs://finngen-production-library-green/ldsc/w_hm3.snplist"
+  Array[String] phenos = transpose(read_tsv(chunk))[0]
+  Array[String] ns = transpose(read_tsv(chunk))[2]
   Array[File] ld_files = read_lines(ld_list)
-  Int disk_size = 30 + 2*ceil(size(fnames[0],'GB')) * length(fnames) + ceil(size(ld_files,'GB'))
+  Int disk_size = 30 + 2*ceil(size(premunged[0],'GB')) * length(premunged) + ceil(size(ld_files,'GB'))
   
   command <<<
 
-  df -h .
-  cat ~{write_lines(phenos)} > phenos.txt &&   cat ~{write_lines(fnames)} > fnames.txt &&  cat ~{write_lines(ns)} > ns.txt
-  # update the table with the premunged paths
-  python3 -c "import sys,os; phenos=[l.strip() for l in open('phenos.txt')]; fnames=[l.strip() for l in open('fnames.txt')]; ns=[l.strip() for l in open('ns.txt')]; [(os.path.basename(f).replace('.premunge.gz','')==p or sys.exit(f'mismatch: {p} {f}')) for p,f in zip(phenos,fnames)]; [print(f'{p}\t{f}\t{n}') for p,f,n in zip(phenos,fnames,ns)]" | nl --number-format=rn --number-width=2 > meta.txt
+  # build input PHENO\tPATH from premunged files
+  cat ~{write_lines(premunged)} > premunged.txt
+  while read f; do name="${f%.premunge.gz}"; pheno="${name##*.}"; original="${name%.*}"; printf '%s\t%s\n' "$pheno" "$(pwd)/$f" >> restored_mapping.tsv ; done < premunged.txt
+  sort -k1 restored_mapping.tsv > premunge_mapping.txt
+  # write mapping based on input chunk Ns
+  paste <(cat ~{write_lines(phenos)}) <(cat ~{write_lines(ns)}) | sort -k1 > ns_mapping.txt
+  # build new table to loop over
+  join -t$'\t' premunge_mapping.txt ns_mapping.txt | nl --number-format=rn --number-width=2 > meta.txt
   head meta.txt
 
   # get ld_path from first file in ld file list
@@ -261,6 +167,66 @@ task munge_ldsc{
       preemptible: 2
   }
 }
+
+
+
+task return_couples {
+
+  input {
+    File file1
+    File file2
+    Int chunks
+    String docker
+    Array[Array[String]] munged_chunks
+  }
+  
+  Array[Array[String]] list1 = read_tsv(file1)
+  Array[Array[String]] list2 = read_tsv(file2)
+  Array[String] munged_sumstats = flatten(munged_chunks)
+
+  command <<<
+
+  # Initalize variables/inputs
+  cat ~{write_lines(munged_sumstats)} > path_list.txt
+  cat ~{write_tsv(list1)} > phenos1.txt
+  cat ~{write_tsv(list2)} > phenos2.txt
+  num_chunks=~{chunks}
+  
+  # 1. Generate unique, sorted pairs
+  awk 'NR==FNR{a[$1];next} {for(i in a) print ($1 < i ? $1"\t"i : i"\t"$1)}' phenos1.txt phenos2.txt | sort -u > all_pairs.tmp
+
+  # 2. Calculate chunk size
+  total_pairs=$(wc -l < all_pairs.tmp)
+  n=$(( (total_pairs + num_chunks - 1) / num_chunks ))
+
+  # 3. Split into chunk files
+  split -l "$n" -d -a 2 all_pairs.tmp chunk_
+
+  # 4. Builds list of required sumstats for each chunk
+  python3 -c "import os, glob; d={os.path.basename(f.strip()).replace('.ldsc.sumstats.gz','').rsplit('.',1)[-1]: f.strip() for f in open('path_list.txt')}; [open(f.replace('chunk_', 'paths_'), 'w').write('\n'.join(set(d[p] for line in open(f) for p in line.strip().split('\t') if p in d))) for f in glob.glob('chunk_*')]"
+  
+  # 5. Cleanup and Metadata
+  echo "$n" > jobs.txt
+  rm all_pairs.tmp
+  >>>
+
+  output {
+      Array[File] couples = glob("./chunk*")
+      Array[File] paths_list = glob("./paths*")
+      Int jobs = read_int("jobs.txt")
+  }
+
+  runtime {
+      docker: "${docker}"
+      cpu: 2
+      memory: "4 GB"
+      disks: "local-disk 10 HDD"
+      zones: "europe-west1-b europe-west1-c europe-west1-d"
+      preemptible: 2
+      noAddress: true
+  }
+}
+
 
 task filter_meta {
 
@@ -360,5 +326,61 @@ task gather_h2{
     zones: "europe-west1-b europe-west1-c europe-west1-d"
     preemptible: 2
     noAddress: true
+  }
+}
+
+
+task multi_rg {
+
+  input {
+    File couples
+    File paths_list
+    File ld_list
+    String name
+    Int cpus
+    Int jobs
+    String docker
+    String? args
+  }
+  Array[File] sumstats = read_lines(paths_list)
+  Array[File] ld_files = read_lines(ld_list)
+  
+  Int final_cpus = if jobs > cpus then cpus else jobs
+  Int mem = 2*cpus
+  Int disk_size = 30 + ceil(size(sumstats[0],"MB")*length(sumstats)/1000)
+
+  
+  command <<<
+  echo ~{disk_size} ~{final_cpus} ~{jobs}
+  # get ld_path from first file in ld file list
+  ld_path="$(dirname ~{ld_files[0]})/"
+  cat ~{write_lines(sumstats)} > sumstats.txt &&  wc -l sumstats.txt
+  cat ~{couples} > couples.txt && wc -l couples.txt
+
+  python3 /scripts/ldsc_mult.py --ldsc-path "python3 /ldsc-2-to-3/ldsc.py "   --list sumstats.txt --couples couples.txt -o ./results/ --ld-path $ld_path  ~{if defined(args) then "--args " + args else ""}
+    
+  echo -e "\nDONE"
+  # write to file list of ldsc log files
+  for f in ./results/*log; do echo $f &&  echo $f >> summaries.txt ; done
+  # copy content of each log into single log file
+  while read f; do cat $f >> ~{name}.log ; done < summaries.txt
+  # extract metadata from each log file
+  python3 /scripts/extract_metadata.py  --summaries summaries.txt  --name ~{name}
+
+  >>>
+
+  output {
+      File log = "${name}.log"
+      File summary = "${name}.ldsc.summary.log"
+  }
+
+  runtime {
+      docker: "${docker}"
+      cpu: "${final_cpus}"
+      memory: "${mem} GB"
+      disks: "local-disk ${disk_size} HDD"
+      zones: "europe-west1-b europe-west1-c europe-west1-d"
+      preemptible: 1
+      noAddress: true
   }
 }
