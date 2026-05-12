@@ -6,14 +6,14 @@
     #"ldsc_rg.munge_fg.args": "String? (optional)",
     #"ldsc_rg.munge_other.args": "String? (optional)",
     #"ldsc_rg.multi_rg.args": "String? (optional)",
+    "ldsc_rg.couples_chunk_size": "20", #should be high, very high, default is 1000, but for testing we want to use smaller chunks
+    "ldsc_rg.filter_chunk_size": "1", #30 is default and optimal, but for testing we want to use smaller chunks
 
     #GLOBAL PARAMS
     "ldsc_rg.name": "finngen_test",
     "ldsc_rg.only_het": "true",
     "ldsc_rg.multi_rg.cpus": "16",
-    "ldsc_rg.population": "FIN",
-    "ldsc_rg.couples_chunk_size": "20",
-    "ldsc_rg.filter_chunk_size": "1",
+    "ldsc_rg.population": "fin",
     
     #FILE 1 INPUTS
     "ldsc_rg.meta_fg": "gs://finngen-production-library-green/ldsc/r13/r13_test.ldsc_table.txt",

@@ -13,7 +13,7 @@ workflow ldsc_rg {
     String docker =  "eu.gcr.io/finngen-sandbox-v3-containers/ldsc:rsid_munge"
     File snplist = "gs://finngen-production-library-green/ldsc/w_hm3.snplist"
     Int filter_chunk_size = 30
-    Int couples_chunk_size = 500
+    Int couples_chunk_size = 1000
   }
 
   File ld_list =sub(ld_root,"POP",population)
@@ -257,11 +257,8 @@ task filter_meta {
   command <<<
   # Chunk fg file
   split -l ~{chunk_size} -d --additional-suffix=.txt ~{meta_fg} chunk_fg
-  # Chunk meta_other entries not already present in meta_fg (matched on first column / pheno)
-  awk 'NR==FNR { a[$1]; next } !($1 in a)' ~{meta_fg} ~{meta_other} > other_only.txt
-  if [ -s other_only.txt ]; then
-    split -l ~{chunk_size} -d --additional-suffix=.txt other_only.txt chunk_other
-  fi
+  # Chunk other file
+  split -l ~{chunk_size} -d --additional-suffix=.txt ~{meta_other} chunk_other
   >>>
   output {
     Array[File] chunk_fg    = glob("./chunk_fg*")
