@@ -93,6 +93,7 @@ task premunge_ss {
     cpu: 1
     memory: "~{mem} GB"
     disks: "local-disk ~{disk_size} HDD"
+    maxRetries: 2
   }
 }
 
@@ -148,6 +149,7 @@ task multi_rg {
       zones: "europe-west1-b europe-west1-c europe-west1-d"
       preemptible: 1
       noAddress: true
+      maxRetries: 2
   }
 }
 
@@ -287,6 +289,7 @@ task munge_ldsc{
       disks: "local-disk ${disk_size} HDD"
       zones: "europe-west1-b europe-west1-c europe-west1-d"
       preemptible: 2
+      maxRetries: 2
   }
 }
 
