@@ -4,46 +4,71 @@ workflow ldsc_rg {
 
   input {
     File meta_fg
-    File? comparison_fg
-    File meta_other = if defined(comparison_fg) then comparison_fg else meta_fg
+    File meta_other
     Boolean only_het
-    
-    String docker
+
     String name
-    
     String population
-    Map[String,File] ld_path
-
+    String ld_root = "gs://finngen-production-library-green/ldsc/POP_ld.txt"
+    String docker =  "eu.gcr.io/finngen-sandbox-v3-containers/ldsc:rsid_munge"
+    File snplist = "gs://finngen-production-library-green/ldsc/w_hm3.snplist"
+    Int filter_chunk_size = 30
+    Int couples_chunk_size = 500
   }
 
-  File ld_list = ld_path[population]
+  File ld_list =sub(ld_root,"POP",population)
   String final_name = name + "_" + population
-   
-  # merge sumstats keeping unique values across them and creating munge chunks
-  call filter_meta {input: meta_fg = meta_fg,meta_other = meta_other, docker = docker}
 
-  #scatter over chunks and run heritability
-  scatter (chunk in filter_meta.chunk_list)
-  {
-    call premunge_ss {input:chunk = chunk,docker = docker }
-    call munge_ldsc{input:docker = docker, chunk = chunk,  ld_list = ld_list,premunged=premunge_ss.premunged}
-  }
-  
-  # gather h2 data from munge step
-  call gather_h2{input: name = final_name,docker = docker,het_jsons = munge_ldsc.het_json,het_log= munge_ldsc.het_log}
+  # Split each input file into chunks; other-only entries are deduplicated against fg
+  call filter_meta { input: meta_fg = meta_fg, meta_other = meta_other, docker = docker, chunk_size = filter_chunk_size }
 
-  if (!only_het)
-  {
-    # returns all valid couples of phenocodes that need to be run in terms of absolute paths from the output of the previous task
-    call return_couples { input : file1 = meta_fg,file2 = meta_other, munged_chunks = munge_ldsc.munged, docker = docker}
-    scatter (i in range(length(return_couples.couples))) {
-      # where the actual work is done
-      call multi_rg {input: couples=return_couples.couples[i], paths_list = return_couples.paths_list[i],jobs = return_couples.jobs, name = i,ld_list =ld_list,docker=docker}
+  # Scatter over fg chunks
+  scatter (chunk in filter_meta.chunk_fg) {
+    call premunge_ss as premunge_fg {
+      input: chunk = chunk, docker = docker
     }
-    # gather all the outputs of multi_rg in order to create a final table
-    call gather_summaries {  input:   docker = docker,   name = final_name,   summaries = multi_rg.summary, logs = multi_rg.log   }
+    call munge_ldsc as munge_fg {
+      input: docker = docker, chunk = chunk, ld_list = ld_list, premunged = premunge_fg.premunged, snplist = snplist
+    }
+  }
+
+  # Only scatter over other chunks when the two input files differ
+  if (meta_fg != meta_other) {
+    scatter (chunk in filter_meta.chunk_other) {
+      call premunge_ss as premunge_other {
+        input: chunk = chunk, docker = docker
+      }
+      call munge_ldsc as munge_other {
+        input: docker = docker, chunk = chunk, ld_list = ld_list, premunged = premunge_other.premunged, snplist = snplist
+      }
+    }
+  }
+
+  # Combine outputs from both scatter arms; other arm is empty when files are identical
+  Array[File] all_het_jsons       = flatten([munge_fg.het_json, select_first([munge_other.het_json, []])])
+  Array[File] all_het_logs        = flatten([munge_fg.het_log,  select_first([munge_other.het_log,  []])])
+  Array[Array[String]] all_munged = flatten([munge_fg.munged,   select_first([munge_other.munged,   []])])
+
+  call gather_h2 {
+    input: name = final_name, docker = docker, het_jsons = all_het_jsons, het_log = all_het_logs
+  }
+
+  if (!only_het) {
+    call return_couples {
+      input: file1 = meta_fg, file2 = meta_other, munged_chunks = all_munged, docker = docker, chunk_size = couples_chunk_size
+    }
+    scatter (i in range(length(return_couples.couples))) {
+      call multi_rg {
+        input: couples = return_couples.couples[i], paths_list = return_couples.paths_list[i],
+               jobs = return_couples.jobs, name = i, ld_list = ld_list, docker = docker
+      }
+    }
+    call gather_summaries {
+      input: docker = docker, name = final_name, summaries = multi_rg.summary, logs = multi_rg.log
+    }
   }
 }
+
 
 task premunge_ss {
   input {
@@ -83,16 +108,14 @@ task premunge_ss {
            ~{if chrom_col != "" then "--chrom-col '" + chrom_col + "'" else ""} \
            ~{if pos_col != "" then "--pos-col '" + pos_col + "'" else ""} \
            ~{if rsid_col != "" then "--rsid '" + rsid_col + "'" else ""}
-      # identify new file and rename it to match PHENO.premunge.gz
+      # identify new file and rename it to ORIGINALBASE.PHENO.premunge.gz
       new_file=$(comm -13 <(echo "$prev" | grep -v '^$') <(ls *.premunge.gz | sort) | head -1)
       raw_base=$(basename "${ss_arr[$i]}") && new_file="${raw_base%.*}.premunge.gz"
       final_name="${new_file/.premunge.gz/.${pheno_arr[$i]}.premunge.gz}"
-      mv "$new_file" "$final_name" && echo "MOVED: $new_file TO: $final_name" && printf '%s\t%s\n' "${pheno_arr[$i]}" "$final_name"
-      printf '%s\t%s\n' "${pheno_arr[$i]}" "$new_file" >> mapping.tsv
+      mv "$new_file" "$final_name" && echo "MOVED: $new_file TO: $final_name"
   done
 
   ls -l *.premunge.gz
-  cat mapping.tsv
   >>>
   output {
     Array[File] premunged = glob("./*.premunge.gz")
@@ -106,12 +129,12 @@ task premunge_ss {
 }
 
 
-task munge_ldsc{
+task munge_ldsc {
 
   input {
     File chunk
     String docker
-    String? args    
+    String? args
     File ld_list
     Array[File] premunged
     File snplist
@@ -121,10 +144,10 @@ task munge_ldsc{
   Array[String] ns = transpose(read_tsv(chunk))[2]
   Array[File] ld_files = read_lines(ld_list)
   Int disk_size = 30 + 2*ceil(size(premunged[0],'GB')) * length(premunged) + ceil(size(ld_files,'GB'))
-  
+
   command <<<
 
-  # build input PHENO\tPATH from premunged files
+  # build PHENO\tPATH mapping from premunged files (paths are already absolute)
   cat ~{write_lines(premunged)} > premunged.txt
   while read f; do name="${f%.premunge.gz}"; pheno="${name##*.}"; printf '%s\t%s\n' "$pheno" "$f" >> restored_mapping.tsv ; done < premunged.txt
   sort -k1 restored_mapping.tsv > premunge_mapping.txt
@@ -147,9 +170,9 @@ task munge_ldsc{
   done < meta.txt
   # merge log files
   cat *ldsc.log >> munge.log &&  cat *ldsc.h2.log >> het.log
-  
+
   # merge jsons into one
-  jq -s 'reduce .[] as $item ({}; . * $item)' ./*json > het.json 
+  jq -s 'reduce .[] as $item ({}; . * $item)' ./*json > het.json
 
   >>>
   output {
@@ -168,16 +191,17 @@ task munge_ldsc{
   }
 }
 
+
 task return_couples {
 
   input {
     File file1
     File file2
-    Int chunks
+    Int chunk_size
     String docker
     Array[Array[String]] munged_chunks
   }
-  
+
   Array[Array[String]] list1 = read_tsv(file1)
   Array[Array[String]] list2 = read_tsv(file2)
   Array[String] munged_sumstats = flatten(munged_chunks)
@@ -188,23 +212,19 @@ task return_couples {
   cat ~{write_lines(munged_sumstats)} > path_list.txt
   cat ~{write_tsv(list1)} > phenos1.txt
   cat ~{write_tsv(list2)} > phenos2.txt
-  num_chunks=~{chunks}
-  
+
   # 1. Generate unique, sorted pairs
   awk 'NR==FNR{a[$1];next} {for(i in a) print ($1 < i ? $1"\t"i : i"\t"$1)}' phenos1.txt phenos2.txt | sort -u > all_pairs.tmp
 
-  # 2. Calculate chunk size
-  total_pairs=$(wc -l < all_pairs.tmp)
-  n=$(( (total_pairs + num_chunks - 1) / num_chunks ))
+  # 2. Split into chunk files of chunk_size pairs each
+  split -l ~{chunk_size} -d -a 2 all_pairs.tmp chunk_
 
-  # 3. Split into chunk files
-  split -l "$n" -d -a 2 all_pairs.tmp chunk_
-
-  # 4. Builds list of required sumstats for each chunk
+  # 3. Builds list of required sumstats for each chunk
+  # Files are PATH.PHENO.ldsc.sumstats.gz; key is the last dot-component before .ldsc.sumstats.gz
   python3 -c "import os, glob; d={os.path.basename(f.strip()).replace('.ldsc.sumstats.gz','').rsplit('.',1)[-1]: f.strip() for f in open('path_list.txt')}; [open(f.replace('chunk_', 'paths_'), 'w').write('\n'.join(set(d[p] for line in open(f) for p in line.strip().split('\t') if p in d))) for f in glob.glob('chunk_*')]"
-  
-  # 5. Cleanup and Metadata
-  echo "$n" > jobs.txt
+
+  # 4. Cleanup and Metadata
+  echo "~{chunk_size}" > jobs.txt
   rm all_pairs.tmp
   >>>
 
@@ -232,16 +252,21 @@ task filter_meta {
     File meta_fg
     File meta_other
     String docker
-    Int filter_chunks
+    Int chunk_size
   }
   command <<<
-  cat ~{meta_fg} > tmp.txt
-  cat ~{meta_other} >> tmp.txt
-  sort tmp.txt | uniq >> meta.txt
-  split -en r/~{filter_chunks} -d --additional-suffix=.txt meta.txt chunk
+  # Chunk fg file
+  split -l ~{chunk_size} -d --additional-suffix=.txt ~{meta_fg} chunk_fg
+  # Chunk meta_other entries not already present in meta_fg (matched on first column / pheno)
+  awk 'NR==FNR { a[$1]; next } !($1 in a)' ~{meta_fg} ~{meta_other} > other_only.txt
+  if [ -s other_only.txt ]; then
+    split -l ~{chunk_size} -d --additional-suffix=.txt other_only.txt chunk_other
+  fi
   >>>
-
-  output {Array[File] chunk_list =  glob("./chunk*")}
+  output {
+    Array[File] chunk_fg    = glob("./chunk_fg*")
+    Array[File] chunk_other = glob("./chunk_other*")
+  }
   runtime {
       docker: "${docker}"
       cpu: 1
@@ -252,6 +277,7 @@ task filter_meta {
       noAddress: true
   }
 }
+
 
 task gather_summaries {
 
@@ -290,7 +316,7 @@ task gather_summaries {
   }
 }
 
-task gather_h2{
+task gather_h2 {
 
   input {
     Array[File] het_jsons
@@ -298,7 +324,6 @@ task gather_h2{
     String name
     String docker
   }
-  
 
   command <<<
   cat ~{write_lines(het_jsons)} >> h2.txt
@@ -342,12 +367,11 @@ task multi_rg {
   }
   Array[File] sumstats = read_lines(paths_list)
   Array[File] ld_files = read_lines(ld_list)
-  
+
   Int final_cpus = if jobs > cpus then cpus else jobs
   Int mem = 2*cpus
   Int disk_size = 30 + ceil(size(sumstats[0],"MB")*length(sumstats)/1000)
 
-  
   command <<<
   echo ~{disk_size} ~{final_cpus} ~{jobs}
   # get ld_path from first file in ld file list
@@ -356,7 +380,7 @@ task multi_rg {
   cat ~{couples} > couples.txt && wc -l couples.txt
 
   python3 /scripts/ldsc_mult.py --ldsc-path "python3 /ldsc-2-to-3/ldsc.py "   --list sumstats.txt --couples couples.txt -o ./results/ --ld-path $ld_path  ~{if defined(args) then "--args " + args else ""}
-    
+
   echo -e "\nDONE"
   # write to file list of ldsc log files
   for f in ./results/*log; do echo $f &&  echo $f >> summaries.txt ; done
