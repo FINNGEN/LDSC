@@ -1,36 +1,54 @@
-# LDSC
+w# LDSC
 
 Wrapper pipeline based on https://github.com/bulik/ldsc.
 
 Most of the work is done by the wdl itself, but some preprocessing steps are needed, mainly due to the fact that the nature of the input sumstats can be different.
 
 ## WDL
-The wdl takes a list of sumstats and generates heritabilites and (optional) genetic correlation between all N(N-1)/2 pairs or iff two separate lists are passed then only between cross N*M pairs.
+The wdl takes a list of sumstats and generates heritabilities and (optional) genetic correlation between all N(N-1)/2 pairs or if two separate lists are passed then only between cross N*M pairs.
 
 ### Inputs
 
+**Global parameters**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `ldsc_rg.meta_fg` | — | Metadata table for primary summary statistics (TSV). |
+| `ldsc_rg.meta_other` | — | Metadata table for secondary sumstats. Pass the same file as `meta_fg` for a self-comparison. |
+| `ldsc_rg.name` | — | Output prefix for result files. |
+| `ldsc_rg.only_het` | — | If `true`, computes only heritabilities (not genetic correlations). |
+| `ldsc_rg.population` | — | Population label used to resolve the LD score file (e.g., `FIN`, `EUR`). |
+| `ldsc_rg.docker` | `eu.gcr.io/finngen-sandbox-v3-containers/ldsc:rsid_munge` | Docker image used for all pipeline tasks. |
+| `ldsc_rg.ld_root` | `gs://finngen-production-library-green/ldsc/POP_ld.txt` | GCS path template for LD score file lists; `POP` is replaced by `population`. |
+| `ldsc_rg.snplist` | `gs://finngen-production-library-green/ldsc/w_hm3.snplist` | SNP list file for LD score regression. |
+| `ldsc_rg.filter_chunk_size` | `30` | Number of phenotypes per premunge/munge scatter shard. Use smaller values for testing. |
+| `ldsc_rg.couples_chunk_size` | `500` | Number of pairs per `multi_rg` scatter shard. Use smaller values for testing. |
+| `ldsc_rg.multi_rg.cpus` | — | Number of CPUs per `multi_rg` shard. |
+| `ldsc_rg.munge_fg.args` | — | (Optional) Extra arguments passed to `ldsc.py` for the fg munge step. |
+| `ldsc_rg.munge_other.args` | — | (Optional) Extra arguments passed to `ldsc.py` for the other munge step. |
+| `ldsc_rg.multi_rg.args` | — | (Optional) Extra arguments passed to `ldsc.py` for the rg step. |
+
+**Premunge parameters — primary list (`meta_fg`)**
 
 | Parameter | Description |
 |-----------|-------------|
-| `ldsc_rg.docker` | Docker image used for pipeline tasks. |
-| `ldsc_rg.only_het` | If `true`, computes only heritabilities (not genetic correlations). |
-| `ldsc_rg.meta_fg` | Metadata table for primary summary statistics (TSV). |
-| `ldsc_rg.comparison_fg` | (Optional) Metadata table for secondary sumstats (for cross-trait analysis). |
-| `ldsc_rg.name` | Output prefix for result files. |
-| `ldsc_rg.population` | Population label for LD score reference (e.g., "EUR", "FIN"). |
-| `ldsc_rg.ld_path` | A map linking population codes to LD score files. |
-| `ldsc_rg.filter_meta.filter_chunks` | Number of chunks to split input tables for parallel processing (increase for large datasets). |
-| `ldsc_rg.premunge_ss.p_col` | Column name for p-value in your sumstats. |
-| `ldsc_rg.premunge_ss.a1_effect_col` | Column name for effect allele. |
-| `ldsc_rg.premunge_ss.a2_ne_col` | Column name for non-effect/reference allele. |
-| `ldsc_rg.premunge_ss.beta_col` | Column name for effect size (beta). |
-| `ldsc_rg.premunge_ss.rsid_col` | Column name for rsIDs. |
-| `ldsc_rg.premunge_ss.chrom_col` | (Optional) Column name for chromosome (if not using rsIDs). |
-| `ldsc_rg.premunge_ss.pos_col` | (Optional) Column name for position (if not using rsIDs). |
-| `ldsc_rg.munge_ldsc.snplist` | Path to snplist file for LD score regression. |
-| `ldsc_rg.return_couples.chunks` | Number of parallel batches for genetic correlation computations. |
-| `ldsc_rg.multi_rg.cpus` | Number of CPUs to use for multi_rg step. |
-| `ldsc_rg.multi_rg.args` | (Optional) Extra arguments passed to ldsc.py. |
+| `ldsc_rg.premunge_fg.beta_col` | Column name for effect size (beta). |
+| `ldsc_rg.premunge_fg.p_col` | Column name for p-value. |
+| `ldsc_rg.premunge_fg.a1_effect_col` | Column name for effect allele. |
+| `ldsc_rg.premunge_fg.a2_ne_col` | Column name for non-effect allele. |
+| `ldsc_rg.premunge_fg.rsid_col` | (Optional) Column name for rsIDs. |
+| `ldsc_rg.premunge_fg.chrom_col` | (Optional) Column name for chromosome (required if no rsID column). |
+| `ldsc_rg.premunge_fg.pos_col` | (Optional) Column name for position (required if no rsID column). |
+
+**Premunge parameters — secondary list (`meta_other`)**
+
+Only required when `meta_other` differs from `meta_fg`. The parameters mirror those above:
+
+| Parameter | Description |
+|-----------|-------------|
+| `ldsc_rg.premunge_other.beta_col` | Column name for effect size (beta). |
+| `ldsc_rg.premunge_other.p_col` | Column name for p-value. |
+| ... | ... |
 
 
 The metadata tables should be  structured as `PHENO\tPATH\tN` where `N` is the total number of valid cases+controls of each pheno.
@@ -64,23 +82,23 @@ Therefore now the the inputs also require to pass the relevant column names for 
 
 ### Long description
 
-Now all the data is ready to run the big run. A brief summary of the logic of the wdl.
+A brief summary of the logic of the wdl.
 
-The boolean flag `het_only` if set to `True` only produces heritabilities and does not compute genetic correlations. It's set to false by default, thus automatically calculating correlations. Please make sure it's your intention to do so.
+`only_het` if set to `true` only produces heritabilities and does not compute genetic correlations. Please make sure it's your intention to compute correlations before setting it to `false`.
 
-As input one can have two lists of sumstats or just one. If two are provided then all the cross scores are computed between the two lists. If only one is passed instead the first list is duplicated as a second, thus running an inner product on itself. The total number of comparison that needs to run is `N*L` jobs to be run where `N` and `L` are the lengths of the two lists. In case of inner product, the number is `N(N-1)/2` instead. This means that the growht is quadratic and thus I recommed first testing the pipeline with a smaller set of sumstats.
+Both `meta_fg` and `meta_other` are always required. Pass the same file for both to run a self-comparison (all N(N-1)/2 pairs within the list). Pass two different files to run a cross-comparison (N*M pairs). The growth is quadratic so it is recommended to test with a smaller set first.
 
-`filter_meta` splits the input lists into chunks for munging. The number of chunks in this step is given by `  "ldsc_rg.filter_meta.filter_chunks": Int`. This step is quite fast anyways and, in principle, should only run once since its output is cached.
+`filter_meta` splits each input list into chunks of `filter_chunk_size` phenotypes. The two lists are chunked independently. If the files are identical the second scatter is skipped entirely. This step is fast and its output is cached.
 
-Each input chunk list is passed to `premunge_ss` that prepares the input sumstats for the ldsc pipeline as described above.
+Each chunk is passed in parallel to `premunge_ss` (`premunge_fg` for `meta_fg`, `premunge_other` for `meta_other`) which prepares the sumstats for ldsc as described above. Column name inputs are specified per call, allowing the two lists to have different formats.
 
-Each input chunk list is passed to `munge_ldsc`. In this step, the input sumstats are munged by ldsc directly and, while we're at it, the heritability is calculated. The outputs of the heritability calculation are passed to `gather_h2` which builds an output table and json with all the summaries, as well as merging all the logs.
+Each premunged chunk is passed to `munge_ldsc` which runs ldsc munging and computes per-phenotype heritability. The heritability outputs from both scatter arms are combined and passed to `gather_h2`, which builds a summary table, JSON, and merged logs.
 
-`return_couples` is the step that harmonizes the two input lists. It checks for duplicates in the two lists and makes sure that the smallest subset of pairwise comparisons are actually ran. The total list of couple pheno comparisons is then split into chunks (defined by  the input ` "ldsc_rg.return_couples.chunks": Int `) producing also a list of sumstats, so that only the requried sumstats are localized.
+`return_couples` builds all unique phenotype pairs across the two lists, splits them into chunks of `couples_chunk_size` pairs each, and for each chunk produces the subset of munged sumstat paths required — so only the necessary files are localized per shard.
 
-The list of pairwise couples and list of paths is pased to `multi_rg` where a wrapper script runs the `ldsc.py --rg` command in a parallelized way. Therefore, increasing the number of CPUs for the job will lead to faster running times.
+Each chunk of pairs is passed to `multi_rg` where a wrapper script runs `ldsc.py --rg` in parallel. Increasing CPUs via `ldsc_rg.multi_rg.cpus` speeds up each shard.
 
-Finally, the output and logs of the step are passed to `gather_summaries` which is the analagous to the previous gather_h2 step:
+Finally `gather_summaries` merges all `multi_rg` outputs into a single table and log:
 ```
 p1	p2	rg	se	z	p	h2_obs	h2_obs_se	h2_int	h2_int_se	gcov_int	gcov_int_se
 AB1_AMOEBIASIS	AB1_AMOEBIASIS	1.0006	0.0009	1139.1313	0.0	0.0009	0.0013	0.9682	0.0061	0.9682	0.0061
@@ -89,8 +107,8 @@ AB1_AMOEBIASIS	AB1_ARTHROPOD	-1.0562	1.0868	-0.9718	0.3311	0.0024	0.0015	0.9977	
 AB1_AMOEBIASIS	AB1_ASPERGILLOSIS	0.7488	0.9701	0.7719	0.4402	0.0019	0.0016	0.981	0.0065	-0.0074	0.0048
 ```
 
-### Other inputs
+### LD scores
 
-The choice of LD scores to be used is between the default European 1kg and the custom built Finngen one. This can be chosen in the json inputs by selection ``` "ldsc_rg.population" ``` as being either ```eur|fin``` as the ```ld_path``` root path will be  automatically updated to download the desired files.
+The LD score file is resolved from `ld_root` by substituting `POP` with the value of `population`. Set `population` to `fin` or `eur` to use the prebuilt FinnGen or 1000 Genomes European LD scores respectively.
 
-FInally, ```dsc_rg.multi_rg.args``` is an optional input that allows to add flags to the default ldsc command.
+`ldsc_rg.multi_rg.args` is an optional input for passing extra flags directly to `ldsc.py`.
