@@ -6,7 +6,6 @@ workflow ldsc_rg {
     File meta_fg
     File meta_other
     Boolean only_het
-
     String name
     String population
     String ld_root = "gs://finngen-production-library-green/ldsc/POP_ld.txt"
@@ -68,7 +67,6 @@ workflow ldsc_rg {
     }
   }
 }
-
 
 task premunge_ss {
   input {

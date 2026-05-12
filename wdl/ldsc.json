@@ -9,7 +9,7 @@
     "ldsc_rg.multi_rg.cpus": "16",
     "ldsc_rg.couples_chunk_size": "20", #should be high, very high, default is 1000, but for testing we want to use smaller chunks
     "ldsc_rg.filter_chunk_size": "1", #30 is default and optimal, but for testing we want to use smaller chunks
-
+    
     #GLOBAL PARAMS
     "ldsc_rg.name": "finngen_test",
     "ldsc_rg.only_het": "false",
@@ -33,6 +33,6 @@
     "ldsc_rg.premunge_other.chrom_col": "#chrom",
     "ldsc_rg.premunge_other.p_col": "pval",
     "ldsc_rg.premunge_other.pos_col": "pos",
-    "ldsc_rg.premunge_other.rsid_col": "",
+    "ldsc_rg.premunge_other.rsid_col": ""
     
 }
