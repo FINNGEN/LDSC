@@ -1,4 +1,4 @@
-# LDSC
+w# LDSC
 
 Wrapper pipeline based on https://github.com/bulik/ldsc.
 

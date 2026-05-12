@@ -125,6 +125,7 @@ task premunge_ss {
     cpu: 1
     memory: "~{mem} GB"
     disks: "local-disk ~{disk_size} HDD"
+    preemptible: 2
   }
 }
 
@@ -134,7 +135,7 @@ task munge_ldsc {
   input {
     File chunk
     String docker
-    String? args
+    String args = ""
     File ld_list
     Array[File] premunged
     File snplist
@@ -166,7 +167,7 @@ task munge_ldsc {
       echo -ne "\r${arr[0]}/~{length(phenos)} ${arr[1]}                  "
       zcat ${arr[2]} > ${arr[1]}.tmp.txt
       python3 /ldsc-2-to-3/munge_sumstats.py  --sumstats ${arr[1]}.tmp.txt    --N ${arr[3]} --out ${arr[1]}.ldsc  --merge-alleles ~{snplist} 1> /dev/null
-      python3 /scripts/het.py  --ldsc-path "python3 /ldsc-2-to-3/ldsc.py"   --sumstats ${arr[1]}.ldsc.sumstats.gz --ld-path $ld_path ~{if defined(args) then "--args " + args else ""} -o . 1> /dev/null ;
+      python3 /scripts/het.py  --ldsc-path "python3 /ldsc-2-to-3/ldsc.py"   --sumstats ${arr[1]}.ldsc.sumstats.gz --ld-path $ld_path ~{if args != "" then "--args " + args else ""} -o . 1> /dev/null ;
   done < meta.txt
   # merge log files
   cat *ldsc.log >> munge.log &&  cat *ldsc.h2.log >> het.log
@@ -357,10 +358,10 @@ task multi_rg {
     File paths_list
     File ld_list
     String name
-    Int cpus
+    Int cpus = 16
     Int jobs
     String docker
-    String? args
+    String args = ""
   }
   Array[File] sumstats = read_lines(paths_list)
   Array[File] ld_files = read_lines(ld_list)
@@ -376,7 +377,7 @@ task multi_rg {
   cat ~{write_lines(sumstats)} > sumstats.txt &&  wc -l sumstats.txt
   cat ~{couples} > couples.txt && wc -l couples.txt
 
-  python3 /scripts/ldsc_mult.py --ldsc-path "python3 /ldsc-2-to-3/ldsc.py "   --list sumstats.txt --couples couples.txt -o ./results/ --ld-path $ld_path  ~{if defined(args) then "--args " + args else ""}
+  python3 /scripts/ldsc_mult.py --ldsc-path "python3 /ldsc-2-to-3/ldsc.py "   --list sumstats.txt --couples couples.txt -o ./results/ --ld-path $ld_path  ~{if args != "" then "--args " + args else ""}
 
   echo -e "\nDONE"
   # write to file list of ldsc log files

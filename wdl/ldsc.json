@@ -1,18 +1,18 @@
 {
-    #OPTIONAL INPUTS NOT USED IN SB    
+    #INPUTS WITH DEFAULTS NOT USED IN SB    
     "ldsc_rg.docker": "eu.gcr.io/finngen-sandbox-v3-containers/ldsc:rsid_munge",
     "ldsc_rg.ld_root": "gs://finngen-production-library-green/ldsc/POP_ld.txt",
     "ldsc_rg.snplist": "gs://finngen-production-library-green/ldsc/w_hm3.snplist",
-    #"ldsc_rg.munge_fg.args": "String? (optional)",
-    #"ldsc_rg.munge_other.args": "String? (optional)",
-    #"ldsc_rg.multi_rg.args": "String? (optional)",
+    "ldsc_rg.munge_fg.args": "",
+    "ldsc_rg.munge_other.args": "",
+    "ldsc_rg.multi_rg.args": "",
+    "ldsc_rg.multi_rg.cpus": "16",
     "ldsc_rg.couples_chunk_size": "20", #should be high, very high, default is 1000, but for testing we want to use smaller chunks
     "ldsc_rg.filter_chunk_size": "1", #30 is default and optimal, but for testing we want to use smaller chunks
 
     #GLOBAL PARAMS
     "ldsc_rg.name": "finngen_test",
-    "ldsc_rg.only_het": "true",
-    "ldsc_rg.multi_rg.cpus": "16",
+    "ldsc_rg.only_het": "false",
     "ldsc_rg.population": "fin",
     
     #FILE 1 INPUTS
