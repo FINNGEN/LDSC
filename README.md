@@ -7,7 +7,9 @@ Most of the work is done by the wdl itself, but some preprocessing steps are nee
 ## WDL
 The wdl takes a list of sumstats and generates heritabilities and (optional) genetic correlation between all N(N-1)/2 pairs or if two separate lists are passed then only between cross N*M pairs.
 
+
 ![Chart](wdl/ldsc_workflow.png)
+
 
 ### Inputs
 

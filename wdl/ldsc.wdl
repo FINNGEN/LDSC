@@ -49,6 +49,7 @@ workflow ldsc_rg {
   # Wraps the two scattered arrays into one, then flattens twice
   Array[String] all_munged = flatten(flatten([munge_fg.munged, select_first([munge_other.munged, []])]))
 
+
   call gather_h2 {
     input: name = final_name, docker = docker, het_jsons = all_het_jsons, het_log = all_het_logs
   }
@@ -56,6 +57,7 @@ workflow ldsc_rg {
   if (!only_het) {
     call return_couples {
       input: file1 = meta_fg, file2 = meta_other, munged_sumstats = all_munged, docker = docker, chunk_size = couples_chunk_size
+
     }
     scatter (i in range(length(return_couples.couples))) {
       call multi_rg {
@@ -74,10 +76,9 @@ workflow ldsc_rg {
     Array[String] munged_ss = all_munged
     File corr_summary = select_first([gather_summaries.summary,gather_h2.herit_tsv])
     File corr_log     = select_first([gather_summaries.log,gather_h2.log])
-  }
-
-  
+  } 
 }
+
 
 task premunge_ss {
   input {
