@@ -2,5 +2,11 @@
     "google_labels":{
         "project":"r14-ldsc",
         "product":"core-analysis-r14"
+    },
+    "default_runtime_attributes": {
+	"zones": "europe-west1-b europe-west1-c europe-west1-d",
+	"cpu":1,
+	"disk":"2 HDD",
+	"memory" : "4 GB"
     }
 }
