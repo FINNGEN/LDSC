@@ -46,7 +46,8 @@ workflow ldsc_rg {
   # Combine outputs from both scatter arms; other arm is empty when files are identical
   Array[File] all_het_jsons       = flatten([munge_fg.het_json, select_first([munge_other.het_json, []])])
   Array[File] all_het_logs        = flatten([munge_fg.het_log,  select_first([munge_other.het_log,  []])])
-  Array[Array[String]] all_munged = flatten([munge_fg.munged,   select_first([munge_other.munged,   []])])
+  # Wraps the two scattered arrays into one, then flattens twice
+  Array[String] all_munged = flatten(flatten([munge_fg.munged, select_first([munge_other.munged, []])]))
 
   call gather_h2 {
     input: name = final_name, docker = docker, het_jsons = all_het_jsons, het_log = all_het_logs
@@ -54,7 +55,7 @@ workflow ldsc_rg {
 
   if (!only_het) {
     call return_couples {
-      input: file1 = meta_fg, file2 = meta_other, munged_chunks = all_munged, docker = docker, chunk_size = couples_chunk_size
+      input: file1 = meta_fg, file2 = meta_other, munged_sumstats = all_munged, docker = docker, chunk_size = couples_chunk_size
     }
     scatter (i in range(length(return_couples.couples))) {
       call multi_rg {
@@ -70,7 +71,7 @@ workflow ldsc_rg {
   output {
     File herit_tsv    = gather_h2.herit_tsv
     File herit_log    = gather_h2.log
-    Array[Array[String]] munged_ss = all_munged
+    Array[String] munged_ss = all_munged
     File corr_summary = select_first([gather_summaries.summary,gather_h2.herit_tsv])
     File corr_log     = select_first([gather_summaries.log,gather_h2.log])
   }
@@ -208,12 +209,11 @@ task return_couples {
     File file2
     Int chunk_size
     String docker
-    Array[Array[String]] munged_chunks
+    Array[String] munged_sumstats
   }
 
   Array[Array[String]] list1 = read_tsv(file1)
   Array[Array[String]] list2 = read_tsv(file2)
-  Array[String] munged_sumstats = flatten(munged_chunks)
 
   command <<<
 
