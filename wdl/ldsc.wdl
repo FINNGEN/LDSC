@@ -9,7 +9,7 @@ workflow ldsc_rg {
     String name
     String population
     String ld_root = "gs://finngen-production-library-green/ldsc/POP_ld.txt"
-    String docker =  "eu.gcr.io/finngen-sandbox-v3-containers/ldsc:rsid_munge"
+    String docker =  "eu.gcr.io/finngen-sandbox-v3-containers/ldsc:rsid_munge.2"
     File snplist = "gs://finngen-production-library-green/ldsc/w_hm3.snplist"
     Int filter_chunk_size = 30
     Int couples_chunk_size = 1000
@@ -105,11 +105,10 @@ task premunge_ss {
   mapfile -t pheno_arr < phenos.txt
   mapfile -t ss_arr < sumstats.txt
   for i in "${!ss_arr[@]}"; do
-      rm -f *pre_convert*
-      prev=$(ls *.premunge.gz 2>/dev/null | sort || true)
       bash /scripts/ldsc_rsid_munge.sh --convert-script /rsid_map/scripts/convert_rsids.py \
            --input "${ss_arr[$i]}" \
            --outdir "$(pwd)" \
+           --pheno "${pheno_arr[$i]}" \
            --rsid-map ~{rsid_map} \
            --beta-col '~{beta_col}' \
            --p-col '~{p_col}' \
@@ -118,11 +117,7 @@ task premunge_ss {
            ~{if chrom_col != "" then "--chrom-col '" + chrom_col + "'" else ""} \
            ~{if pos_col != "" then "--pos-col '" + pos_col + "'" else ""} \
            ~{if rsid_col != "" then "--rsid '" + rsid_col + "'" else ""}
-      # identify new file and rename it to ORIGINALBASE.PHENO.premunge.gz
-      new_file=$(comm -13 <(echo "$prev" | grep -v '^$') <(ls *.premunge.gz | sort) | head -1)
-      raw_base=$(basename "${ss_arr[$i]}") && new_file="${raw_base%.*}.premunge.gz"
-      final_name="${new_file/.premunge.gz/.${pheno_arr[$i]}.premunge.gz}"
-      mv "$new_file" "$final_name" && echo "MOVED: $new_file TO: $final_name"
+      rm -f *pre_convert*
   done
 
   ls -l *.premunge.gz
