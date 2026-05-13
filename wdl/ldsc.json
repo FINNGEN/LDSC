@@ -12,7 +12,7 @@
     
     #GLOBAL PARAMS
     "ldsc_rg.name": "finngen_test",
-    "ldsc_rg.only_het": "true",
+    "ldsc_rg.only_het": "false",
     "ldsc_rg.population": "fin",
     
     #FILE 1 INPUTS

@@ -9,7 +9,7 @@ workflow ldsc_rg {
     String name
     String population
     String ld_root = "gs://finngen-production-library-green/ldsc/POP_ld.txt"
-    String docker =  "eu.gcr.io/finngen-sandbox-v3-containers/ldsc:rsid_munge"
+    String docker =  "eu.gcr.io/finngen-sandbox-v3-containers/ldsc:rsid_munge.2"
     File snplist = "gs://finngen-production-library-green/ldsc/w_hm3.snplist"
     Int filter_chunk_size = 30
     Int couples_chunk_size = 1000
