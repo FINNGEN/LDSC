@@ -33,6 +33,7 @@ while [[ $# -gt 0 ]]; do
         --pos-col)   POS_COL="$1"; shift ;;
         --rsid-map)  RSID_MAP="$1"; shift ;;
         --convert-script) CONVERT_SCRIPT="$1"; shift ;;
+        --pheno)     PHENO="$1"; shift ;;
         *) usage ;;
     esac
 done
@@ -41,12 +42,12 @@ done
 if [[ -z "$INPUT" || -z "$OUTDIR" || -z "$BETA_COL" || -z "$P_COL" || -z "$A1_COL" || -z "$A2_COL" ]]; then usage; fi
 mkdir -p "$OUTDIR"
 
-# Basename stripping .gz and .txt
 BASE=$(basename "$INPUT")
 for ext in .txt.gz .tsv.gz .gz .txt .tsv; do
     BASE="${BASE%$ext}"
 done
-OUTFILE="${OUTDIR}/${BASE}.premunge.gz"
+[[ -n "$PHENO" ]] && OUTBASE="${BASE}.${PHENO}" || OUTBASE="${BASE}"
+OUTFILE="${OUTDIR}/${OUTBASE}.premunge.gz"
 echo "BASE: $BASE"
 echo "OUTFILE: $OUTFILE"
 
@@ -78,8 +79,8 @@ if [[ -z "$CHROM_COL" || -z "$POS_COL" || -z "$RSID_MAP" ]]; then
     usage
 fi
 
-TMP_PRECONVERT="${OUTDIR}/${BASE}.pre_convert.tsv.gz"
-TMP_RSID="${OUTDIR}/${BASE}.pre_convert.tsv.rsid.gz"
+TMP_PRECONVERT="${OUTDIR}/${OUTBASE}.pre_convert.tsv.gz"
+TMP_RSID="${OUTDIR}/${OUTBASE}.pre_convert.tsv.rsid.gz"
 
 # 1. Build "SNPID" column as "CHR:POS:A1:A2"
 python3 -c "

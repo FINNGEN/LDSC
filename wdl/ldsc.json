@@ -1,6 +1,6 @@
 {
     #INPUTS WITH DEFAULTS NOT USED IN SB    
-    "ldsc_rg.docker": "eu.gcr.io/finngen-sandbox-v3-containers/ldsc:rsid_munge",
+    "ldsc_rg.docker": "eu.gcr.io/finngen-sandbox-v3-containers/ldsc:rsid_munge.2",
     "ldsc_rg.ld_root": "gs://finngen-production-library-green/ldsc/POP_ld.txt",
     "ldsc_rg.snplist": "gs://finngen-production-library-green/ldsc/w_hm3.snplist",
     "ldsc_rg.munge_fg.args": "",
@@ -12,7 +12,7 @@
     
     #GLOBAL PARAMS
     "ldsc_rg.name": "finngen_test",
-    "ldsc_rg.only_het": "false",
+    "ldsc_rg.only_het": "true",
     "ldsc_rg.population": "fin",
     
     #FILE 1 INPUTS
@@ -26,7 +26,7 @@
     "ldsc_rg.premunge_fg.rsid_col": "rsids",
     
     #FILE 2 INPUTS
-    "ldsc_rg.meta_other": "gs://finngen-production-library-green/ldsc/kanta/kanta_ldsc.txt",
+    "ldsc_rg.meta_other": "gs://finngen-production-library-green/ldsc/kanta/kanta_names.txt",
     "ldsc_rg.premunge_other.a1_effect_col": "alt",
     "ldsc_rg.premunge_other.a2_ne_col": "ref",
     "ldsc_rg.premunge_other.beta_col": "beta",

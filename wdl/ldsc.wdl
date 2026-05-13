@@ -105,11 +105,10 @@ task premunge_ss {
   mapfile -t pheno_arr < phenos.txt
   mapfile -t ss_arr < sumstats.txt
   for i in "${!ss_arr[@]}"; do
-      rm -f *pre_convert*
-      prev=$(ls *.premunge.gz 2>/dev/null | sort || true)
       bash /scripts/ldsc_rsid_munge.sh --convert-script /rsid_map/scripts/convert_rsids.py \
            --input "${ss_arr[$i]}" \
            --outdir "$(pwd)" \
+           --pheno "${pheno_arr[$i]}" \
            --rsid-map ~{rsid_map} \
            --beta-col '~{beta_col}' \
            --p-col '~{p_col}' \
@@ -118,11 +117,7 @@ task premunge_ss {
            ~{if chrom_col != "" then "--chrom-col '" + chrom_col + "'" else ""} \
            ~{if pos_col != "" then "--pos-col '" + pos_col + "'" else ""} \
            ~{if rsid_col != "" then "--rsid '" + rsid_col + "'" else ""}
-      # identify new file and rename it to ORIGINALBASE.PHENO.premunge.gz
-      new_file=$(comm -13 <(echo "$prev" | grep -v '^$') <(ls *.premunge.gz | sort) | head -1)
-      raw_base=$(basename "${ss_arr[$i]}") && new_file="${raw_base%.*}.premunge.gz"
-      final_name="${new_file/.premunge.gz/.${pheno_arr[$i]}.premunge.gz}"
-      mv "$new_file" "$final_name" && echo "MOVED: $new_file TO: $final_name"
+      rm -f *pre_convert*
   done
 
   ls -l *.premunge.gz
