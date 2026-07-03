@@ -222,11 +222,8 @@ task return_couples {
   awk 'NR==FNR{a[$1];next} {for(i in a) print ($1 < i ? $1"\t"i : i"\t"$1)}' phenos1.txt phenos2.txt | sort -u > all_pairs.tmp
 
   # 2. Split into chunk files of chunk_size pairs each
-  split -l "$n" -d -a 5 all_pairs.tmp chunk_
-  num_chunks=~{chunk_size}
-  suffix_len=${#num_chunks}
-  split -n l/"$num_chunks" -d -a "$suffix_len" all_pairs.tmp chunk_
-  echo "$num_chunks" > jobs.txt
+  split -l ~{chunk_size} -d -a 5 all_pairs.tmp chunk_
+
   # 3. Builds list of required sumstats for each chunk
   # Files are PATH.PHENO.ldsc.sumstats.gz; key is the last dot-component before .ldsc.sumstats.gz
   python3 -c "import os, glob; d={os.path.basename(f.strip()).replace('.ldsc.sumstats.gz','').rsplit('.',1)[-1]: f.strip() for f in open('path_list.txt')}; [open(f.replace('chunk_', 'paths_'), 'w').write('\n'.join(set(d[p] for line in open(f) for p in line.strip().split('\t') if p in d))) for f in glob.glob('chunk_*')]"
