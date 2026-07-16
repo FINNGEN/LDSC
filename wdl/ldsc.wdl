@@ -222,7 +222,7 @@ task return_couples {
   awk 'NR==FNR{a[$1];next} {for(i in a) print ($1 < i ? $1"\t"i : i"\t"$1)}' phenos1.txt phenos2.txt | sort -u > all_pairs.tmp
 
   # 2. Split into chunk files of chunk_size pairs each
-  split -l ~{chunk_size} -d -a 2 all_pairs.tmp chunk_
+  split -l ~{chunk_size} -d -a 5 all_pairs.tmp chunk_
 
   # 3. Builds list of required sumstats for each chunk
   # Files are PATH.PHENO.ldsc.sumstats.gz; key is the last dot-component before .ldsc.sumstats.gz

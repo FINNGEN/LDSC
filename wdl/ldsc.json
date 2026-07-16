@@ -7,7 +7,7 @@
     "ldsc_rg.munge_other.args": "",
     "ldsc_rg.multi_rg.args": "",
     "ldsc_rg.multi_rg.cpus": "16",
-    "ldsc_rg.couples_chunk_size": "20", #should be high, very high, default is 1000, but for testing we want to use smaller chunks
+    "ldsc_rg.couples_chunk_size": "20", #should be high, very high, around 1000 for heavy jobs
     "ldsc_rg.filter_chunk_size": "1", #30 is default and optimal, but for testing we want to use smaller chunks
     
     #GLOBAL PARAMS
