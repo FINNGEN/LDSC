@@ -16,7 +16,7 @@
     "ldsc_rg.population": "fin",
     
     #FILE 1 INPUTS
-    "ldsc_rg.meta_fg": "gs://finngen-production-library-green/ldsc/r14/r14.ldsc_table.txt",
+    "ldsc_rg.meta_fg": "gs://finngen-production-library-green/ldsc/r14/r14_test.ldsc_table.txt",
     "ldsc_rg.premunge_fg.a1_effect_col": "alt",
     "ldsc_rg.premunge_fg.a2_ne_col": "ref",
     "ldsc_rg.premunge_fg.beta_col": "beta",
