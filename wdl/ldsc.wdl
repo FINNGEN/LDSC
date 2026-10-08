@@ -95,7 +95,7 @@ task premunge_ss {
   File rsid_map = "gs://finngen-production-library-green/rsids/convert/finngen.rsid.map.tsv.pickle"
   Array[String] phenos = transpose(read_tsv(chunk))[0]
   Array[File] sumstats = transpose(read_tsv(chunk))[1]
-  Int mem = if rsid_col == "" then 16 else 4
+  Int mem = if rsid_col == "" then 8 else 4
   Int disk_size = 10 + 2*ceil(size(sumstats[0],'GB')) * length(sumstats) + ceil(size(rsid_map,'GB'))
   command <<<
   set -euo pipefail
@@ -195,7 +195,7 @@ task munge_ldsc {
   runtime {
       docker: "${docker}"
       cpu: 1
-      memory: "8 GB"
+      memory: "4 GB"
       disks: "local-disk ${disk_size} HDD"
       zones: "europe-west1-b europe-west1-c europe-west1-d"
       preemptible: 2
@@ -389,7 +389,7 @@ task multi_rg {
   Array[File] ld_files = read_lines(ld_list)
 
   Int final_cpus = if jobs > cpus then cpus else jobs
-  Int mem = 8*cpus
+  Int mem = 2*cpus
   Int disk_size = 30 + ceil(size(sumstats[0],"MB")*length(sumstats)/1000)
 
   command <<<
