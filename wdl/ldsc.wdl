@@ -95,7 +95,7 @@ task premunge_ss {
   File rsid_map = "gs://finngen-production-library-green/rsids/convert/finngen.rsid.map.tsv.pickle"
   Array[String] phenos = transpose(read_tsv(chunk))[0]
   Array[File] sumstats = transpose(read_tsv(chunk))[1]
-  Int mem = if rsid_col == "" then 8 else 4
+  Int mem = if rsid_col == "" then 16 else 4
   Int disk_size = 10 + 2*ceil(size(sumstats[0],'GB')) * length(sumstats) + ceil(size(rsid_map,'GB'))
   command <<<
   set -euo pipefail
@@ -147,20 +147,25 @@ task munge_ldsc {
   }
 
   Array[String] phenos = transpose(read_tsv(chunk))[0]
+  Array[String] sumstats = transpose(read_tsv(chunk))[1]
   Array[String] ns = transpose(read_tsv(chunk))[2]
   Array[File] ld_files = read_lines(ld_list)
   Int disk_size = 30 + 2*ceil(size(premunged[0],'GB')) * length(premunged) + ceil(size(ld_files,'GB'))
 
   command <<<
 
-  # build PHENO\tPATH mapping from premunged files (paths are already absolute)
+  # build PHENO\tPATH\tN table to loop over. premunge_ss names files BASE.PHENO.premunge.gz,
+  # where BASE is the input basename without extension; match on the full name since phenos can contain dots
   cat ~{write_lines(premunged)} > premunged.txt
-  while read f; do name="${f%.premunge.gz}"; pheno="${name##*.}"; printf '%s\t%s\n' "$pheno" "$f" >> restored_mapping.tsv ; done < premunged.txt
-  sort -k1 restored_mapping.tsv > premunge_mapping.txt
-  # write mapping based on input chunk Ns
-  paste <(cat ~{write_lines(phenos)}) <(cat ~{write_lines(ns)}) | sort -k1 > ns_mapping.txt
-  # build new table to loop over
-  join -t$'\t' premunge_mapping.txt ns_mapping.txt | nl --number-format=rn --number-width=2 > meta.txt
+  paste <(cat ~{write_lines(phenos)}) <(cat ~{write_lines(sumstats)}) <(cat ~{write_lines(ns)}) > chunk_meta.txt
+  while IFS=$'\t' read pheno ss n; do
+      base=$(basename "$ss")
+      for ext in .txt.gz .tsv.gz .gz .txt .tsv; do base="${base%$ext}"; done
+      f=$(awk -v t="${base}.${pheno}.premunge.gz" '{n = split($0, p, "/")} p[n] == t' premunged.txt)
+      if [[ -z "$f" ]]; then echo "ERROR: no premunged file ${base}.${pheno}.premunge.gz for $pheno" >&2; exit 1; fi
+      printf '%s\t%s\t%s\n' "$pheno" "$f" "$n"
+  done < chunk_meta.txt > pheno_meta.txt
+  nl --number-format=rn --number-width=2 pheno_meta.txt > meta.txt
   head meta.txt
 
   # get ld_path from first file in ld file list
@@ -190,7 +195,7 @@ task munge_ldsc {
   runtime {
       docker: "${docker}"
       cpu: 1
-      memory: "4 GB"
+      memory: "8 GB"
       disks: "local-disk ${disk_size} HDD"
       zones: "europe-west1-b europe-west1-c europe-west1-d"
       preemptible: 2
@@ -225,8 +230,8 @@ task return_couples {
   split -l ~{chunk_size} -d -a 5 all_pairs.tmp chunk_
 
   # 3. Builds list of required sumstats for each chunk
-  # Files are PATH.PHENO.ldsc.sumstats.gz; key is the last dot-component before .ldsc.sumstats.gz
-  python3 -c "import os, glob; d={os.path.basename(f.strip()).replace('.ldsc.sumstats.gz','').rsplit('.',1)[-1]: f.strip() for f in open('path_list.txt')}; [open(f.replace('chunk_', 'paths_'), 'w').write('\n'.join(set(d[p] for line in open(f) for p in line.strip().split('\t') if p in d))) for f in glob.glob('chunk_*')]"
+  # Files are PHENO.ldsc.sumstats.gz; key is the full basename before .ldsc.sumstats.gz (phenos can contain dots)
+  python3 -c "import os, glob; d={os.path.basename(f.strip()).removesuffix('.ldsc.sumstats.gz'): f.strip() for f in open('path_list.txt')};[open(f.replace('chunk_', 'paths_'), 'w').write('\n'.join(set(d[p] for line in open(f) for p in line.strip().split('\t') if p in d))) for f in glob.glob('chunk_*')]"
 
   # 4. Cleanup and Metadata
   echo "~{chunk_size}" > jobs.txt
@@ -260,10 +265,23 @@ task filter_meta {
     Int chunk_size
   }
   command <<<
+  set -euo pipefail
+  # Drop exact duplicate rows, then fail if a pheno name still has more than one distinct row
+  dedup_meta() {
+      awk '!seen[$0]++' "$1" > "$2"
+      dups=$(cut -f1 "$2" | sort | uniq -d)
+      if [[ -n "$dups" ]]; then
+          echo "ERROR: pheno names with more than one distinct row in $1:" >&2
+          echo "$dups" >&2
+          exit 1
+      fi
+  }
+  dedup_meta ~{meta_fg} meta_fg.tsv
+  dedup_meta ~{meta_other} meta_other.tsv
   # Chunk fg file
-  split -l ~{chunk_size} -d --additional-suffix=.txt ~{meta_fg} chunk_fg
+  split -l ~{chunk_size} -d --additional-suffix=.txt meta_fg.tsv chunk_fg
   # Chunk other file
-  split -l ~{chunk_size} -d --additional-suffix=.txt ~{meta_other} chunk_other
+  split -l ~{chunk_size} -d --additional-suffix=.txt meta_other.tsv chunk_other
   >>>
   output {
     Array[File] chunk_fg    = glob("./chunk_fg*")
@@ -371,7 +389,7 @@ task multi_rg {
   Array[File] ld_files = read_lines(ld_list)
 
   Int final_cpus = if jobs > cpus then cpus else jobs
-  Int mem = 2*cpus
+  Int mem = 8*cpus
   Int disk_size = 30 + ceil(size(sumstats[0],"MB")*length(sumstats)/1000)
 
   command <<<
