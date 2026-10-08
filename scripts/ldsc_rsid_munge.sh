@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # Usage Info
 usage() {
@@ -9,6 +10,7 @@ Usage:
 
 - If --rsid is provided, it uses the input RSID column directly, skipping mapping.
 - If --rsid is NOT provided, it requires chrom/pos/alleles and maps to RSID using --rsid-map.
+- If --rsid is provided but the column is missing from the input, it exits with an error.
 
 Other options:
   --convert-script <path>   (default: ~/Dropbox/Projects/commons/rsid_map/scripts/convert_rsids.py)
@@ -17,6 +19,24 @@ EOF
 }
 
 CONVERT_SCRIPT=${CONVERT_SCRIPT:-~/Dropbox/Projects/LDSC/rsid_map/scripts/convert_rsids.py}
+INPUT="" OUTDIR="" BETA_COL="" P_COL="" A1_COL="" A2_COL="" RSID_COL=""
+CHROM_COL="" POS_COL="" RSID_MAP="" PHENO=""
+
+# Fail if the output has no data rows (header only or empty)
+check_output() {
+    local n
+    n=$(python3 -c "
+import gzip, sys
+with gzip.open(sys.argv[1], 'rt') as f:
+    n = sum(1 for _ in f)
+print(max(n - 1, 0))
+" "$1")
+    if [[ "$n" -eq 0 ]]; then
+        echo "ERROR: $1 has no data rows." >&2
+        exit 1
+    fi
+    echo "Wrote $n variants to $1"
+}
 
 # Parse args
 while [[ $# -gt 0 ]]; do
@@ -51,6 +71,25 @@ OUTFILE="${OUTDIR}/${OUTBASE}.premunge.gz"
 echo "BASE: $BASE"
 echo "OUTFILE: $OUTFILE"
 
+# Print the given column names that are missing from the input header
+missing_cols() {
+    python3 -c "
+import gzip, sys
+f = sys.argv[1]
+with (gzip.open(f, 'rt') if f.endswith('.gz') else open(f)) as fin:
+    header = fin.readline().rstrip('\n').split('\t')
+print(' '.join(c for c in sys.argv[2:] if c not in header))
+" "$INPUT" "$@"
+}
+
+REQUIRED_COLS=("$BETA_COL" "$P_COL" "$A1_COL" "$A2_COL")
+[[ -n "$RSID_COL" ]] && REQUIRED_COLS+=("$RSID_COL") || REQUIRED_COLS+=("$CHROM_COL" "$POS_COL")
+MISSING=$(missing_cols "${REQUIRED_COLS[@]}")
+if [[ -n "$MISSING" ]]; then
+    echo "ERROR: columns not found in $INPUT: $MISSING" >&2
+    exit 1
+fi
+
 ##################################
 # If --rsid is given: Shortcut: #
 ##################################
@@ -67,6 +106,7 @@ with (gzip.open(f, 'rt') if f.endswith('.gz') else open(f)) as fin, gzip.open(o,
         writer.writerow([row[rs], row[a1], row[a2], row[b], row[p]])
 " \
     "$INPUT" "$OUTFILE" "$RSID_COL" "$A1_COL" "$A2_COL" "$BETA_COL" "$P_COL"
+    check_output "$OUTFILE"
     echo "All done! Final file is: ${OUTFILE}"
     exit 0
 fi
@@ -107,6 +147,7 @@ python3 "$CONVERT_SCRIPT" \
 
 # 3. Finalize: Move result to .premunge.gz
 mv "$TMP_RSID" "$OUTFILE"
+check_output "$OUTFILE"
 echo "All done! Final file is: $OUTFILE"
 
 
