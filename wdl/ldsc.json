@@ -1,6 +1,6 @@
 {
     #INPUTS WITH DEFAULTS NOT USED IN SB    
-    "ldsc_rg.docker": "eu.gcr.io/finngen-sandbox-v3-containers/ldsc:rsid_munge.2",
+    "ldsc_rg.docker": "eu.gcr.io/finngen-sandbox-v3-containers/ldsc:rsid_munge.3",
     "ldsc_rg.ld_root": "gs://finngen-production-library-green/ldsc/POP_ld.txt",
     "ldsc_rg.snplist": "gs://finngen-production-library-green/ldsc/w_hm3.snplist",
     "ldsc_rg.munge_fg.args": "",
